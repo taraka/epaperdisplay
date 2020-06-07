@@ -22,12 +22,12 @@ pub fn display(image: &mut Image) {
     let my_width = WIDTH / 8;
 
     send_command(0x13);
-    for j in 0..Height {
+    for j in 0..HEIGHT {
         for i in 0..my_width {
-            send_data(!blackimage[i + j * my_width]);
+            send_data(!image[(i + j * my_width) as usize]);
         }
     }
-    EPD_7IN5_V2_TurnOnDisplay();
+    turn_on_display();
 }
 
 

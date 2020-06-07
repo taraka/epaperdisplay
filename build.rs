@@ -20,7 +20,6 @@ fn main() {
         .file("lib/font24.c")
         .file("lib/font16.c")
         .file("lib/font12CN.c")
-        .file("lib/EPD_7in5_V2.c")
 
         // This should be found by ld but not sure why it wasn't working
         .object("/usr/lib/libwiringPi.so")
