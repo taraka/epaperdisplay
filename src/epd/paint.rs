@@ -7,10 +7,6 @@ extern {
     fn Paint_Clear(color: u16);
     fn Paint_DrawBitMap(image: *const u8);
 
-
-    fn Paint_DrawPoint(x_point: u16, y_point: u16, color: u16, dot_pixel: Dot_Pixel, dot_style: Dot_Style);
-    fn Paint_DrawLine(x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: u16, line_width: Dot_Pixel, line_style: Line_Style);
-    fn Paint_DrawRectangle(x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: u16, stroke_width: Dot_Pixel, draw_fill: Draw_Fill);
     fn Paint_DrawCircle(x_center: u16, y_center: u16, radius: u16, color: u16, stroke_width: Dot_Pixel, draw_fill: Draw_Fill);
     fn Paint_DrawString_EN(x_start: u16, y_start: u16, string: *const c_char, font: *const Font, fg_color: u16, bg_color: u16);
     fn Paint_DrawNum(x_start: u16, y_start: u16, string: i32, font: *const Font, fg_color: u16, bg_color: u16);
@@ -41,6 +37,7 @@ extern "C" {
 
 pub type ImageData = Box<[u8]>;
 
+#[derive(Clone, Copy)]
 pub enum Color {
     White = 0xff,
     Black = 0x00
@@ -54,6 +51,7 @@ enum Mirror {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub enum Dot_Pixel {
     DOT_PIXEL_1X1  = 1,
     DOT_PIXEL_2X2,
@@ -129,18 +127,6 @@ pub fn clear(color: Color) {
 
 pub fn draw_bitmap(image: Box<[u8]>) {
     unsafe { Paint_DrawBitMap(image.as_ptr()) }
-}
-
-pub fn draw_point(x_point: u16, y_point: u16, color: Color, dot_pixel: Dot_Pixel, dot_style: Dot_Style) {
-    unsafe { Paint_DrawPoint(x_point, y_point, color as u16, dot_pixel,  dot_style); }
-}
-
-pub fn draw_line(x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, line_style: Line_Style) {
-    unsafe { Paint_DrawLine(x_start, y_start, x_end, y_end, color as u16, line_width, line_style) }
-}
-
-pub fn draw_rectangle(x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, draw_fill: Draw_Fill) {
-    unsafe { Paint_DrawRectangle(x_start, y_start, x_end, y_end, color as u16, line_width, draw_fill) }
 }
 
 pub fn draw_circle(x_center: u16, y_center: u16, radius: u16, color: Color, line_width: Dot_Pixel, draw_fill: Draw_Fill) {
@@ -239,6 +225,74 @@ impl Image {
             Color::Black => currentData & !(0x80 >> (x % 8) as u8 ),
             Color::White =>  currentData | (0x80 >> (x % 8) as u8 )
         }
+
+    }
+
+    pub fn draw_line(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, line_style: Line_Style) {
+        if x_start > self.width || y_start > self.height ||
+            x_end > self.width || y_end > self.height {
+            return;
+        }
+
+        let dx = if x_end - x_start >= 0 { x_end - x_start } else { x_start - x_end };
+        let dy = if y_end - y_start <= 0 { y_end - y_start } else { y_start - y_end };
+
+        let x_addway = if x_start < x_end { 1 } else { -1 };
+        let y_addway = if y_start < y_end { 1 } else { -1 };
+
+        //Cumulative error
+        let mut esp = dx + dy;
+        let mut dotted_len: u8 = 0;
+
+        let mut x_point= x_start;
+        let mut y_point = y_start;
+
+        loop {
+            dotted_len = dotted_len + 1;
+            //Painted dotted line, 2 point is really virtual
+
+            if line_style == Line_Style::LINE_STYLE_DOTTED && dotted_len % 3 == 0 {
+                self.draw_point(x_point, y_point, self.color, line_width, Dot_Style::DOT_FILL_AROUND);
+                Dotted_Len = 0;
+            } else {
+                self.draw_point(x_point, y_point, color, line_width, Dot_Style::DOT_FILL_AROUND);
+            }
+
+            if 2 * esp >= dy {
+                if x_point == x_end {
+                    break;
+                }
+                esp += dy;
+                x_point = x_point + x_addway;
+            }
+            if 2 * Esp <= dx {
+                if y_point == y_end {
+                    break;
+                }
+                esp += dx;
+                y_point += y_addway;
+            }
+        }
+    }
+
+
+    pub fn draw_rectangle(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, draw_fill: Draw_Fill) {
+        if x_start > self.width || y_start > self.height ||
+            x_end > self.width || y_end > self.height {
+            return;
+        }
+
+            if draw_fill == Draw_Fill::DRAW_FILL_FULL {
+
+                for y_point in y_start..y_end {
+                    self.draw_line(x_start, y_point, x_end, y_point, color , line_width, Line_Style::LINE_STYLE_SOLID);
+                }
+            } else {
+                self.draw_line(x_start, y_start, Xend, Ystart, color, line_width, Line_Style::LINE_STYLE_SOLID);
+                self.draw_line(x_start, y_start, x_start, y_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
+                self.draw_line(x_end, y_end, x_end, y_start, color, line_width, Line_Style::LINE_STYLE_SOLID);
+                self.draw_line(x_end, y_end, x_start, e_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
+            }
 
     }
 }
