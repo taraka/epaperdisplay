@@ -16,6 +16,7 @@ pub enum Color {
     Black = 0x00
 }
 
+#[repr(C)]
 pub enum Dot_Pixel {
     DOT_PIXEL_1X1  = 1,
     DOT_PIXEL_2X2,
@@ -26,7 +27,7 @@ pub enum Dot_Pixel {
     DOT_PIXEL_7X7,
     DOT_PIXEL_8X8,
 }
-
+#[repr(C)]
 pub enum Dot_Style {
     DOT_FILL_AROUND  = 1,		// dot pixel 1 x 1
     DOT_FILL_RIGHTUP  , 		// dot pixel 2 X 2
