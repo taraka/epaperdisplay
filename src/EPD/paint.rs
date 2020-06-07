@@ -7,6 +7,8 @@ extern {
 
     //void Paint_DrawPoint(UWORD Xpoint, UWORD Ypoint, UWORD Color, DOT_PIXEL Dot_Pixel, DOT_STYLE Dot_FillWay);
     fn Paint_DrawPoint(x_point: u16, y_point: u16, color: u16, dot_pixel: Dot_Pixel, dot_style: Dot_Style);
+    //void Paint_DrawLine(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD Color, DOT_PIXEL Line_width, LINE_STYLE Line_Style);
+    fn Paint_DrawLine(x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, line_style: Line_Style);
 }
 
 pub type Image = Box<[u8]>;
@@ -33,6 +35,13 @@ pub enum Dot_Style {
     DOT_FILL_RIGHTUP  , 		// dot pixel 2 X 2
 }
 
+#[repr(C)]
+pub enum Line_Style {
+    LINE_STYLE_SOLID = 0,
+    LINE_STYLE_DOTTED,
+}
+
+
 pub fn new_image(width: u16, height: u16) -> Image {
     let image_size: usize = ( if width % 8 == 0 { width / 8 } else { width / 8 + 1} ) as usize * height as usize;
     let mut image: Image = vec![0; image_size].into_boxed_slice();
@@ -56,4 +65,8 @@ pub fn draw_bitmap(image: Box<[u8]>) {
 
 pub fn draw_point(x_point: u16, y_point: u16, color: Color, dot_pixel: Dot_Pixel, dot_style: Dot_Style) {
     unsafe { Paint_DrawPoint(x_point, y_point, color as u16, dot_pixel,  dot_style); }
+}
+
+pub fn draw_line(x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, line_style: Line_Style) {
+    unsafe { Paint_DrawLine(x_start, y_start, x_end, y_end, color, line_width, line_style) }
 }

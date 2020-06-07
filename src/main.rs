@@ -55,9 +55,10 @@ fn main() {
     EPD::paint::draw_point(10, 90, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_2X2, EPD::paint::Dot_Style::DOT_FILL_AROUND);
     EPD::paint::draw_point(10, 100, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_3X3, EPD::paint::Dot_Style::DOT_FILL_AROUND);
 
-    
-//    Paint_DrawLine(20, 70, 70, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-//    Paint_DrawLine(70, 70, 20, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+
+      EPD::paint::draw_line(20, 70, 70, 120, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Line_Style::LINE_STYLE_SOLID);
+      EPD::paint::draw_line(70, 70, 20, 120, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Line_Style::LINE_STYLE_SOLID);
+
 //    Paint_DrawRectangle(20, 70, 70, 120, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
 //    Paint_DrawRectangle(80, 70, 130, 120, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 //    Paint_DrawCircle(45, 95, 20, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
