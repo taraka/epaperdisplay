@@ -55,22 +55,21 @@ fn main() {
     EPD::paint::draw_point(10, 90, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_2X2, EPD::paint::Dot_Style::DOT_FILL_AROUND);
     EPD::paint::draw_point(10, 100, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_3X3, EPD::paint::Dot_Style::DOT_FILL_AROUND);
 
+    EPD::paint::draw_line(20, 70, 70, 120, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Line_Style::LINE_STYLE_SOLID);
+    EPD::paint::draw_line(70, 70, 20, 120, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Line_Style::LINE_STYLE_SOLID);
 
-      EPD::paint::draw_line(20, 70, 70, 120, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Line_Style::LINE_STYLE_SOLID);
-      EPD::paint::draw_line(70, 70, 20, 120, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Line_Style::LINE_STYLE_SOLID);
-
-//    Paint_DrawRectangle(20, 70, 70, 120, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-//    Paint_DrawRectangle(80, 70, 130, 120, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-//    Paint_DrawCircle(45, 95, 20, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-//    Paint_DrawCircle(105, 95, 20, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-//    Paint_DrawLine(85, 95, 125, 95, BLACK, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-//    Paint_DrawLine(105, 75, 105, 115, BLACK, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-//    Paint_DrawString_EN(10, 0, "waveshare", &Font16, BLACK, WHITE);
-//    Paint_DrawString_EN(10, 20, "hello world", &Font12, WHITE, BLACK);
-//    Paint_DrawNum(10, 33, 123456789, &Font12, BLACK, WHITE);
-//    Paint_DrawNum(10, 50, 987654321, &Font16, WHITE, BLACK);
-//    Paint_DrawString_CN(130, 0, " ���abc", &Font12CN, BLACK, WHITE);
-//    Paint_DrawString_CN(130, 20, "΢ѩ����", &Font24CN, WHITE, BLACK);
+    EPD::paint::draw_rectangle(20, 70, 70, 120, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Draw_Fill::DRAW_FILL_EMPTY);
+    EPD::paint::draw_rectangle(80, 70, 130, 120, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Draw_Fill::DRAW_FILL_FULL);
+    EPD::paint::draw_circle(45, 95, 20, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Draw_Fill::DRAW_FILL_EMPTY);
+    EPD::paint::draw_circle(105, 95, 20, EPD::paint::Color::White, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Draw_Fill::DRAW_FILL_FULL);
+    EPD::paint::draw_line(85, 95, 125, 95, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Line_Style::LINE_STYLE_DOTTED);
+    EPD::paint::draw_line(105, 75, 105, 115, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Line_Style::LINE_STYLE_DOTTED);
+//    Paint_DrawString_EN(10, 0, String::from("waveshare"), &Font16, EPD::paint::Color::Black, EPD::paint::Color::White);
+//    Paint_DrawString_EN(10, 20, String::from("hello world"), &Font12, EPD::paint::Color::White, EPD::paint::Color::Black);
+//    Paint_DrawNum(10, 33, 123456789, &Font12, EPD::paint::Color::Black, EPD::paint::Color::White);
+//    Paint_DrawNum(10, 50, 987654321, &Font16, EPD::paint::Color::White, EPD::paint::Color::Black);
+//    Paint_DrawString_CN(130, 0, String::from(" ���abc"), &Font12CN, EPD::paint::Color::Black, EPD::paint::Color::White);
+//    Paint_DrawString_CN(130, 20, String::from("΢ѩ����"), &Font24CN, EPD::paint::Color::White, EPD::paint::Color::Black);
 
     println!("EPD_Display");
     EPD::display::d7in5_v2::display(&mut black_image);
