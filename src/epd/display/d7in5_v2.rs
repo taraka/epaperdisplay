@@ -1,13 +1,6 @@
 use crate::epd::paint::Image;
 use crate::epd::device::*;
 
-
-extern {
-    fn EPD_7IN5_V2_Clear();
-    fn EPD_7IN5_V2_Display(image: *mut u8);
-    fn EPD_7IN5_V2_Sleep();
-}
-
 pub const WIDTH: u16 = 800;
 pub const HEIGHT: u16 = 480;
 
@@ -26,13 +19,16 @@ pub fn clear() {
 }
 
 pub fn display(image: &mut Image) {
-    unsafe { EPD_7IN5_V2_Display(image.as_mut_ptr()) }
-}
+    let my_width = WIDTH / 8;
 
-pub fn sleep() {
-    unsafe { EPD_7IN5_V2_Sleep(); }
+    send_command(0x13);
+    for j in 0..Height {
+        for i in 0..my_width {
+            send_data(!blackimage[i + j * my_width]);
+        }
+    }
+    EPD_7IN5_V2_TurnOnDisplay();
 }
-
 
 
 pub fn init() {
@@ -69,6 +65,13 @@ pub fn init() {
     send_data(0x22);
 }
 
+pub fn sleep()
+{
+    send_command(0x02);  	//power off
+    wait_until_idle();
+    send_command(0x07);  	//deep sleep
+    send_data(0xA5);
+}
 
 pub fn reset()
 {
@@ -107,7 +110,6 @@ fn wait_until_idle()
         if (digital_read(Pin::EPD_BUSY_PIN) & 0x01) == 0x01 {
             break;
         }
-        println!("Waiting");
         delay_ms(5);
     }
     delay_ms(200);
