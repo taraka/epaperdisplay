@@ -180,74 +180,74 @@ parameter:
 void Paint_SetPixel(UWORD Xpoint, UWORD Ypoint, UWORD Color)
 {
     if(Xpoint > Paint.Width || Ypoint > Paint.Height){
-        Debug("Exceeding display boundaries\r\n");
-        return;
-    }      
-    UWORD X, Y;
-    switch(Paint.Rotate) {
-    case 0:
-        X = Xpoint;
-        Y = Ypoint;  
-        break;
-    case 90:
-        X = Paint.WidthMemory - Ypoint - 1;
-        Y = Xpoint;
-        break;
-    case 180:
-        X = Paint.WidthMemory - Xpoint - 1;
-        Y = Paint.HeightMemory - Ypoint - 1;
-        break;
-    case 270:
-        X = Ypoint;
-        Y = Paint.HeightMemory - Xpoint - 1;
-        break;
-    default:
-        return;
-    }
-    
-    switch(Paint.Mirror) {
-    case MIRROR_NONE:
-        break;
-    case MIRROR_HORIZONTAL:
-        X = Paint.WidthMemory - X - 1;
-        break;
-    case MIRROR_VERTICAL:
-        Y = Paint.HeightMemory - Y - 1;
-        break;
-    case MIRROR_ORIGIN:
-        X = Paint.WidthMemory - X - 1;
-        Y = Paint.HeightMemory - Y - 1;
-        break;
-    default:
-        return;
-    }
+            Debug("Exceeding display boundaries\r\n");
+            return;
+        }
+        UWORD X, Y;
+        switch(Paint.Rotate) {
+        case 0:
+            X = Xpoint;
+            Y = Ypoint;
+            break;
+        case 90:
+            X = Paint.WidthMemory - Ypoint - 1;
+            Y = Xpoint;
+            break;
+        case 180:
+            X = Paint.WidthMemory - Xpoint - 1;
+            Y = Paint.HeightMemory - Ypoint - 1;
+            break;
+        case 270:
+            X = Ypoint;
+            Y = Paint.HeightMemory - Xpoint - 1;
+            break;
+        default:
+            return;
+        }
 
-    if(X > Paint.WidthMemory || Y > Paint.HeightMemory){
-        Debug("Exceeding display boundaries\r\n");
-        return;
-    }
-    
-    if(Paint.Scale == 2){
-        UDOUBLE Addr = X / 8 + Y * Paint.WidthByte;
-        UBYTE Rdata = Paint.Image[Addr];
-        if(Color == BLACK)
-            Paint.Image[Addr] = Rdata & ~(0x80 >> (X % 8));
-        else
-            Paint.Image[Addr] = Rdata | (0x80 >> (X % 8));
-    }else if(Paint.Scale == 4){
-        UDOUBLE Addr = X / 4 + Y * Paint.WidthByte;
-        Color = Color % 4;//Guaranteed color scale is 4  --- 0~3
-        UBYTE Rdata = Paint.Image[Addr];
-        
-        Rdata = Rdata & (~(0xC0 >> ((X % 4)*2)));//Clear first, then set value
-        Paint.Image[Addr] = Rdata | ((Color << 6) >> ((X % 4)*2));
-    }else if(Paint.Scale == 7){
-		UDOUBLE Addr = X / 2  + Y * Paint.WidthByte;
-		UBYTE Rdata = Paint.Image[Addr];
-		Rdata = Rdata & (~(0xF0 >> ((X % 2)*4)));//Clear first, then set value
-		Paint.Image[Addr] = Rdata | ((Color << 4) >> ((X % 2)*4));
-		//printf("Add =  %d ,data = %d\r\n",Addr,Rdata);
-	}
+        switch(Paint.Mirror) {
+        case MIRROR_NONE:
+            break;
+        case MIRROR_HORIZONTAL:
+            X = Paint.WidthMemory - X - 1;
+            break;
+        case MIRROR_VERTICAL:
+            Y = Paint.HeightMemory - Y - 1;
+            break;
+        case MIRROR_ORIGIN:
+            X = Paint.WidthMemory - X - 1;
+            Y = Paint.HeightMemory - Y - 1;
+            break;
+        default:
+            return;
+        }
+
+        if(X > Paint.WidthMemory || Y > Paint.HeightMemory){
+            Debug("Exceeding display boundaries\r\n");
+            return;
+        }
+
+        if(Paint.Scale == 2){
+            UDOUBLE Addr = X / 8 + Y * Paint.WidthByte;
+            UBYTE Rdata = Paint.Image[Addr];
+            if(Color == BLACK)
+                Paint.Image[Addr] = Rdata & ~(0x80 >> (X % 8));
+            else
+                Paint.Image[Addr] = Rdata | (0x80 >> (X % 8));
+        }else if(Paint.Scale == 4){
+            UDOUBLE Addr = X / 4 + Y * Paint.WidthByte;
+            Color = Color % 4;//Guaranteed color scale is 4  --- 0~3
+            UBYTE Rdata = Paint.Image[Addr];
+
+            Rdata = Rdata & (~(0xC0 >> ((X % 4)*2)));//Clear first, then set value
+            Paint.Image[Addr] = Rdata | ((Color << 6) >> ((X % 4)*2));
+        }else if(Paint.Scale == 7){
+    		UDOUBLE Addr = X / 2  + Y * Paint.WidthByte;
+    		UBYTE Rdata = Paint.Image[Addr];
+    		Rdata = Rdata & (~(0xF0 >> ((X % 2)*4)));//Clear first, then set value
+    		Paint.Image[Addr] = Rdata | ((Color << 4) >> ((X % 2)*4));
+    		//printf("Add =  %d ,data = %d\r\n",Addr,Rdata);
+    	}
 }
 
 /******************************************************************************

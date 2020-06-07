@@ -24,7 +24,7 @@ pub fn display(image: &mut Image) {
     send_command(0x13);
     for j in 0..HEIGHT {
         for i in 0..my_width {
-            send_data(!image[(i + j * my_width) as usize]);
+            send_data(!image.image[(i + j * my_width) as usize]);
         }
     }
     turn_on_display();
