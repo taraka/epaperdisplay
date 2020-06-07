@@ -12,7 +12,17 @@ pub const WIDTH: u16 = 800;
 pub const HEIGHT: u16 = 480;
 
 pub fn clear() {
-    unsafe { EPD_7IN5_V2_Clear() }
+    let my_width = if WIDTH % 8 == 0 { WIDTH / 8 } else { WIDTH / 8 + 1 };
+
+    send_command(0x10);
+    for i in 0..HEIGHT*my_width {
+        send_data(0x00);
+    }
+    send_command(0x13);
+    for i in 0..HEIGHT*my_width	{
+        send_data(0x00);
+    }
+    turn_on_display();
 }
 
 pub fn display(image: &mut Image) {
@@ -99,4 +109,11 @@ fn wait_until_idle()
         }
     }
     delay_ms(200);
+}
+
+fn turn_on_display()
+{
+    send_command(0x12);			//DISPLAY REFRESH
+    delay_ms(100);	        // The delay here is necessary, 200uS at least!!!
+    wait_until_idle();
 }
