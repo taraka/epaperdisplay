@@ -74,6 +74,8 @@
 #include <string.h> //memset()
 #include <math.h>
 
+#include <stdio.h>
+
 PAINT Paint;
 
 /******************************************************************************
@@ -553,6 +555,8 @@ void Paint_DrawString_EN(UWORD Xstart, UWORD Ystart, const char * pString,
 {
     UWORD Xpoint = Xstart;
     UWORD Ypoint = Ystart;
+
+
 
     if (Xstart > Paint.Width || Ystart > Paint.Height) {
         Debug("Paint_DrawString_EN Input exceeds the normal display range\r\n");

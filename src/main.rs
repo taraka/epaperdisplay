@@ -20,30 +20,30 @@ fn main() {
     println!("Paint_NewImage");
     let mut black_image = EPD::paint::new_image(EPD::display::d7in5_v2::WIDTH, EPD::display::d7in5_v2::HEIGHT);
 
-
-
-    println!("show window BMP-----------------");
-    EPD::paint::select_image(&mut black_image);
-    EPD::paint::clear(EPD::paint::Color::White);
-    EPD::bmp::read_bmp(String::from("./pic/100x100.bmp"), 10, 10);
-    EPD::display::d7in5_v2::display(&mut black_image);
-    EPD::device::delay_ms(2000);
-
-    println!("show BMP------------------------");
-    EPD::paint::select_image(&mut black_image);
-    EPD::paint::clear(EPD::paint::Color::White);
-    EPD::bmp::read_bmp(String::from("./pic/7in5_V2.bmp"), 0, 0);
-    EPD::display::d7in5_v2::display(&mut black_image);
-    EPD::device::delay_ms(2000);
-
-
-    println!("show image for array -----------------");
-    EPD::paint::select_image(&mut black_image);
-    EPD::paint::clear(EPD::paint::Color::White);
-    EPD::paint::draw_bitmap(gImage_7in5_V2().into_boxed_slice());
-    EPD::display::d7in5_v2::display(&mut black_image);
-    EPD::device::delay_ms(2000);
-
+//
+//
+//    println!("show window BMP-----------------");
+//    EPD::paint::select_image(&mut black_image);
+//    EPD::paint::clear(EPD::paint::Color::White);
+//    EPD::bmp::read_bmp(String::from("./pic/100x100.bmp"), 10, 10);
+//    EPD::display::d7in5_v2::display(&mut black_image);
+//    EPD::device::delay_ms(2000);
+//
+//    println!("show BMP------------------------");
+//    EPD::paint::select_image(&mut black_image);
+//    EPD::paint::clear(EPD::paint::Color::White);
+//    EPD::bmp::read_bmp(String::from("./pic/7in5_V2.bmp"), 0, 0);
+//    EPD::display::d7in5_v2::display(&mut black_image);
+//    EPD::device::delay_ms(2000);
+//
+//
+//    println!("show image for array -----------------");
+//    EPD::paint::select_image(&mut black_image);
+//    EPD::paint::clear(EPD::paint::Color::White);
+//    EPD::paint::draw_bitmap(gImage_7in5_V2().into_boxed_slice());
+//    EPD::display::d7in5_v2::display(&mut black_image);
+//    EPD::device::delay_ms(2000);
+//
 
     println!("SelectImage:BlackImage");
     EPD::paint::select_image(&mut black_image);
@@ -76,7 +76,7 @@ fn main() {
     EPD::device::delay_ms(2000);
 
     println!("Clear...");
-    EPD::display::d7in5_v2::clear();
+    //EPD::display::d7in5_v2::clear();
 
     println!("Goto Sleep...");
     EPD::display::d7in5_v2::sleep();

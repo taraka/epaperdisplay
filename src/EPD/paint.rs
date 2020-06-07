@@ -12,7 +12,7 @@ extern {
     fn Paint_DrawLine(x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: u16, line_width: Dot_Pixel, line_style: Line_Style);
     fn Paint_DrawRectangle(x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: u16, stroke_width: Dot_Pixel, draw_fill: Draw_Fill);
     fn Paint_DrawCircle(x_center: u16, y_center: u16, radius: u16, color: u16, stroke_width: Dot_Pixel, draw_fill: Draw_Fill);
-    fn Paint_DrawString_EN(x_start: u16, y_start: u16, string: *const c_char, font: Font, fg_color: u16, bg_color: u16);
+    fn Paint_DrawString_EN(x_start: u16, y_start: u16, string: *const c_char, font: *const Font, fg_color: u16, bg_color: u16);
 
 }
 
@@ -106,23 +106,23 @@ pub fn draw_circle(x_center: u16, y_center: u16, radius: u16, color: Color, line
     unsafe { Paint_DrawCircle(x_center, y_center, radius, color as u16, line_width, draw_fill) }
 }
 
-pub fn draw_string(x_center: u16, y_center: u16, string: String, font: Font, fg_color: Color, bg_color: Color) {
-    unsafe { Paint_DrawString_EN(x_center, y_center, CString::new(string).expect("failed to make string").as_ptr(), font, fg_color as u16, bg_color as u16) }
+pub fn draw_string(x_start: u16, y_start: u16, string: String, font: Box<Font>, fg_color: Color, bg_color: Color) {
+    unsafe { Paint_DrawString_EN(x_start, y_start, CString::new(string).expect("failed to make string").as_ptr(), &*font, fg_color as u16, bg_color as u16) }
 }
 
 
-pub fn font8() -> Font {
-    return unsafe { Font8 };
+pub fn font8() -> Box<Font> {
+    return unsafe { Box::new(Font8) };
 }
-pub fn font12() -> Font {
-    return unsafe { Font12 };
+pub fn font12() -> Box<Font> {
+    return unsafe { Box::new(Font12) };
 }
-pub fn font16() -> Font {
-    return unsafe { Font16 };
+pub fn font16() -> Box<Font> {
+    return unsafe { Box::new(Font16) };
 }
-pub fn font20() -> Font {
-    return unsafe { Font20 };
+pub fn font20() -> Box<Font> {
+    return unsafe { Box::new(Font20) };
 }
-pub fn font24() -> Font {
-    return unsafe { Font24 };
+pub fn font24() -> Box<Font> {
+    return unsafe { Box::new(Font24) };
 }
