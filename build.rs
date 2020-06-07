@@ -11,7 +11,6 @@ fn main() {
         .file("lib/DEV_Config.c")
         .file("lib/dev_hardware_SPI.c")
         .file("lib/RPI_sysfs_gpio.c")
-        .file("lib/ImageData.c")
         .file("lib/GUI_Paint.c")
         .file("lib/GUI_BMPfile.c")
         .file("lib/font12.c")
@@ -22,7 +21,6 @@ fn main() {
         .file("lib/font16.c")
         .file("lib/font12CN.c")
         .file("lib/EPD_7in5_V2.c")
-        .file("lib/EPD_7in5_V2_test.c")
 
         // This should be found by ld but not sure why it wasn't working
         .object("/usr/lib/libwiringPi.so")
