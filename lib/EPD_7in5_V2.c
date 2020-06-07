@@ -45,6 +45,7 @@ static void EPD_Reset(void)
     DEV_Delay_ms(200);
 }
 
+
 /******************************************************************************
 function :	send command
 parameter:

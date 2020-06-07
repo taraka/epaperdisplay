@@ -1,5 +1,8 @@
 extern {
     fn Paint_NewImage(image: *mut u8, width: u16, height: u16, rotate: u16, color: u16);
+    fn Paint_SelectImage(image: *mut u8);
+    fn Paint_Clear(color: u16);
+    fn Paint_DrawBitMap(image: *const u8);
 }
 
 pub type Image = Box<[u8]>;
@@ -16,4 +19,16 @@ pub fn new_image(width: u16, height: u16) -> Image {
     unsafe { Paint_NewImage(image.as_mut_ptr(), width, height, 0, Color::White as u16) };
 
     return image;
+}
+
+pub fn select_image(image: &mut Image) {
+    unsafe { Paint_SelectImage(image.as_mut_ptr()) }
+}
+
+pub fn clear(color: Color) {
+    unsafe { Paint_Clear(color as u16) }
+}
+
+pub fn draw_bitmap(image: Box<[u8]>) {
+    unsafe { Paint_DrawBitMap(image.as_ptr()) }
 }
