@@ -12,14 +12,14 @@ pub const WIDTH: u16 = 800;
 pub const HEIGHT: u16 = 480;
 
 pub fn clear() {
-    let my_width = if WIDTH % 8 == 0 { WIDTH / 8 } else { WIDTH / 8 + 1 };
+    let my_width = WIDTH / 8;
 
     send_command(0x10);
-    for i in 0..HEIGHT*my_width {
+    for i in 0..(HEIGHT*my_width) {
         send_data(0x00);
     }
     send_command(0x13);
-    for i in 0..HEIGHT*my_width	{
+    for i in 0..(HEIGHT*my_width)	{
         send_data(0x00);
     }
     turn_on_display();
@@ -104,9 +104,11 @@ fn wait_until_idle()
 {
     loop {
         send_command(0x71);
-        if !digital_read(Pin::EPD_BUSY_PIN) & 0x01 == 0x01 {
+        if (digital_read(Pin::EPD_BUSY_PIN) & 0x01) == 0x01 {
             break;
         }
+        println!("Waiting");
+        delay_ms(5);
     }
     delay_ms(200);
 }

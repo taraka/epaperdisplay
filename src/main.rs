@@ -1,8 +1,7 @@
 mod epd;
 
 fn main() {
-    draw_stuff();
-
+   draw_stuff();
 }
 
 

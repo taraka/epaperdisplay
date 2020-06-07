@@ -1,8 +1,7 @@
-
+use std::{thread, time};
 
 extern {
     fn DEV_Module_Init() -> u8;
-    fn DEV_Delay_ms(xms: u32);
     fn DEV_Module_Exit();
 
     fn DEV_Digital_Write(pin: u16, value: u8);
@@ -30,8 +29,8 @@ pub fn module_exit() {
     unsafe { DEV_Module_Exit() }
 }
 
-pub fn delay_ms(delay: u32) {
-    unsafe { DEV_Delay_ms(delay) }
+pub fn delay_ms(delay: u64) {
+    thread::sleep(time::Duration::from_millis(delay));
 }
 
 pub fn digital_write(pin: Pin, value: u8) {
