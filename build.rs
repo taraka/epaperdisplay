@@ -14,7 +14,6 @@ fn main() {
         .file("lib/ImageData.c")
         .file("lib/GUI_Paint.c")
         .file("lib/GUI_BMPfile.c")
-
         .file("lib/font12.c")
         .file("lib/font24CN.c")
         .file("lib/font8.c")

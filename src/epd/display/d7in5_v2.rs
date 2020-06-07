@@ -1,4 +1,4 @@
-use crate::EPD::paint::Image;
+use crate::epd::paint::Image;
 
 
 extern {
@@ -26,3 +26,4 @@ pub fn display(image: &mut Image) {
 pub fn sleep() {
     unsafe { EPD_7IN5_V2_Sleep(); }
 }
+
