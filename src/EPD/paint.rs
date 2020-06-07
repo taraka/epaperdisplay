@@ -13,6 +13,7 @@ extern {
     fn Paint_DrawRectangle(x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: u16, stroke_width: Dot_Pixel, draw_fill: Draw_Fill);
     fn Paint_DrawCircle(x_center: u16, y_center: u16, radius: u16, color: u16, stroke_width: Dot_Pixel, draw_fill: Draw_Fill);
     fn Paint_DrawString_EN(x_start: u16, y_start: u16, string: *const c_char, font: *const Font, fg_color: u16, bg_color: u16);
+    fn Paint_DrawNum(x_start: u16, y_start: u16, string: i32, font: *const Font, fg_color: u16, bg_color: u16);
 
 }
 
@@ -110,6 +111,9 @@ pub fn draw_string(x_start: u16, y_start: u16, string: String, font: Box<Font>, 
     unsafe { Paint_DrawString_EN(x_start, y_start, CString::new(string).expect("failed to make string").as_ptr(), &*font, fg_color as u16, bg_color as u16) }
 }
 
+pub fn draw_num(x_start: u16, y_start: u16, number: i32, font: Box<Font>, fg_color: Color, bg_color: Color) {
+    unsafe { Paint_DrawNum(x_start, y_start, number, &*font, fg_color as u16, bg_color as u16) }
+}
 
 pub fn font8() -> Box<Font> {
     return unsafe { Box::new(Font8) };

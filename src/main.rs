@@ -66,10 +66,8 @@ fn main() {
     EPD::paint::draw_line(105, 75, 105, 115, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Line_Style::LINE_STYLE_DOTTED);
     EPD::paint::draw_string(10, 0, String::from("waveshare"), EPD::paint::font16(), EPD::paint::Color::Black, EPD::paint::Color::White);
     EPD::paint::draw_string(10, 20, String::from("hello world"), EPD::paint::font12(), EPD::paint::Color::White, EPD::paint::Color::Black);
-//    Paint_DrawNum(10, 33, 123456789, &Font12, EPD::paint::Color::Black, EPD::paint::Color::White);
-//    Paint_DrawNum(10, 50, 987654321, &Font16, EPD::paint::Color::White, EPD::paint::Color::Black);
-//    Paint_DrawString_CN(130, 0, String::from(" ���abc"), &Font12CN, EPD::paint::Color::Black, EPD::paint::Color::White);
-//    Paint_DrawString_CN(130, 20, String::from("΢ѩ����"), &Font24CN, EPD::paint::Color::White, EPD::paint::Color::Black);
+    EPD::paint::draw_num(10, 33, 123456789, EPD::paint::font12(), EPD::paint::Color::Black, EPD::paint::Color::White);
+    EPD::paint::draw_num(10, 50, 987654321, EPD::paint::font16(), EPD::paint::Color::White, EPD::paint::Color::Black);
 
     println!("EPD_Display");
     EPD::display::d7in5_v2::display(&mut black_image);
