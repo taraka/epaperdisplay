@@ -51,7 +51,7 @@ fn main() {
 
     // 2.Drawing on the image
     println!("Drawing:BlackImage");
-//    Paint_DrawPoint(10, 80, BLACK, DOT_PIXEL_1X1, DOT_STYLE_DFT);
+    EPD::paint::draw_point(10, 80, EPD::paint::Color::Black, EPD::paint::Dot_Pixel::DOT_PIXEL_1X1, EPD::paint::Dot_Style::DOT_FILL_AROUND);
 //    Paint_DrawPoint(10, 90, BLACK, DOT_PIXEL_2X2, DOT_STYLE_DFT);
 //    Paint_DrawPoint(10, 100, BLACK, DOT_PIXEL_3X3, DOT_STYLE_DFT);
 //    Paint_DrawLine(20, 70, 70, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
