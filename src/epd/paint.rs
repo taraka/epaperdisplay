@@ -5,13 +5,7 @@ use crate::epd::paint::Dot_Style::DOT_FILL_AROUND;
 
 
 extern {
-    fn Paint_NewImage(image: *mut u8, width: u16, height: u16, rotate: u16, color: u16);
-    fn Paint_SelectImage(image: *mut u8);
-    fn Paint_Clear(color: u16);
     fn Paint_DrawBitMap(image: *const u8);
-
-    fn Paint_DrawCircle(x_center: u16, y_center: u16, radius: u16, color: u16, stroke_width: Dot_Pixel, draw_fill: Draw_Fill);
-    fn Paint_DrawString_EN(x_start: u16, y_start: u16, string: *const c_char, font: *const Font, fg_color: u16, bg_color: u16);
     fn Paint_DrawNum(x_start: u16, y_start: u16, string: i32, font: *const Font, fg_color: u16, bg_color: u16);
 
 }
@@ -125,24 +119,8 @@ pub fn new_image(width: u16, height: u16, color: Color) -> Image {
     }
 }
 
-pub fn select_image(image: &mut ImageData) {
-    unsafe { Paint_SelectImage(image.as_mut_ptr()) }
-}
-
-pub fn clear(color: Color) {
-    unsafe { Paint_Clear(color as u16) }
-}
-
 pub fn draw_bitmap(image: Box<[u8]>) {
     unsafe { Paint_DrawBitMap(image.as_ptr()) }
-}
-
-pub fn draw_circle(x_center: u16, y_center: u16, radius: u16, color: Color, line_width: Dot_Pixel, draw_fill: Draw_Fill) {
-    unsafe { Paint_DrawCircle(x_center, y_center, radius, color as u16, line_width, draw_fill) }
-}
-
-pub fn draw_string(x_start: u16, y_start: u16, string: String, font: Box<Font>, fg_color: Color, bg_color: Color) {
-    unsafe { Paint_DrawString_EN(x_start, y_start, CString::new(string).expect("failed to make string").as_ptr(), &*font, fg_color as u16, bg_color as u16) }
 }
 
 pub fn draw_num(x_start: u16, y_start: u16, number: i32, font: Box<Font>, fg_color: Color, bg_color: Color) {
@@ -329,4 +307,70 @@ impl Image {
             }
         }
     }
+
+    pub fn draw_string(&mut self, x_start: u16, y_start: u16, string: &str, font: Box<Font>, fg_color: Color, bg_color: Color) {
+        if x_start > self.width || y_start > self.height {
+            return;
+        }
+
+        let mut x = x_start;
+        let mut y = y_start;
+
+        for (_, c) in string.chars().enumerate() {
+            //if X direction filled , reposition to(Xstart,Ypoint),Ypoint is Y direction plus the Height of the character
+            if (x + font.width ) > self.width {
+                x = x_start;
+                y += font.height;
+            }
+
+            // If the Y direction is full, reposition to(Xstart, Ystart)
+            if (y  + self.height ) > self.height {
+                x = x_start;
+                y = y_start;
+            }
+            self.draw_char(x, y, c, &font, fg_color, bg_color);
+
+            //The next word of the abscissa increases the font of the broadband
+            x += font.width;
+        }
+    }
+
+    pub fn draw_char(&mut self, x_start: u16, y_start: u16, c: char, font: &Box<Font>, fg_color: Color, bg_color: Color) {
+        if x_start > self.width || y_start > self.height {
+            return;
+        }
+
+        let mut offset = (c as u16 - ' ' as u16) * font.height * (font.width / 8 + (if font.width % 8 != 0 { 1 } else { 0 }));
+
+        for page in 0..font.height {
+            for column in 0..font.width {
+
+                let data = unsafe { *font.table.offset(offset as isize) };
+
+                //To determine whether the font background color and screen background color is consistent
+                if bg_color == self.color { //this process is to speed up the scan
+                    if data as u16 & (0x80 >> (column % 8)) != 0 {
+                        self.set_pixel(x_start + column, y_start + page, fg_color);
+                    }
+                    // Paint_DrawPoint(Xpoint + Column, Ypoint + Page, Color_Foreground, DOT_PIXEL_DFT, DOT_STYLE_DFT);
+                } else {
+                    if data as u16 & (0x80 >> (column % 8)) != 0 {
+                        self.set_pixel(x_start + column, y_start + page, fg_color);
+                        // Paint_DrawPoint(Xpoint + Column, Ypoint + Page, Color_Foreground, DOT_PIXEL_DFT, DOT_STYLE_DFT);
+                    } else {
+                        self.set_pixel(x_start + column, y_start + page, bg_color);
+                        // Paint_DrawPoint(Xpoint + Column, Ypoint + Page, Color_Background, DOT_PIXEL_DFT, DOT_STYLE_DFT);
+                    }
+                }
+                //One pixel is 8 bits
+                if column % 8 == 7 {
+                    offset += 1;
+                }
+            }// Write a line
+            if font.width % 8 != 0 {
+                offset += 1;
+            }
+        }// Write all
+    }
+
 }

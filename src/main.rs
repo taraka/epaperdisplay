@@ -63,7 +63,7 @@ fn draw_stuff() {
       image.draw_circle(105, 95, 20, epd::paint::Color::White, epd::paint::Dot_Pixel::DOT_PIXEL_1X1, epd::paint::Draw_Fill::DRAW_FILL_FULL);
       image.draw_line(85, 95, 125, 95, epd::paint::Color::Black, epd::paint::Dot_Pixel::DOT_PIXEL_1X1, epd::paint::Line_Style::LINE_STYLE_DOTTED);
       image.draw_line(105, 75, 105, 115, epd::paint::Color::Black, epd::paint::Dot_Pixel::DOT_PIXEL_1X1, epd::paint::Line_Style::LINE_STYLE_DOTTED);
-      // epd::paint::draw_string(10, 0, String::from("waveshare"), epd::paint::font16(), epd::paint::Color::Black, epd::paint::Color::White);
+      image.draw_string(10, 0, "waveshare", epd::paint::font16(), epd::paint::Color::Black, epd::paint::Color::White);
       // epd::paint::draw_string(10, 20, String::from("hello world"), epd::paint::font12(), epd::paint::Color::White, epd::paint::Color::Black);
       // epd::paint::draw_num(10, 33, 123456789, epd::paint::font12(), epd::paint::Color::Black, epd::paint::Color::White);
       // epd::paint::draw_num(10, 50, 987654321, epd::paint::font16(), epd::paint::Color::White, epd::paint::Color::Black);
