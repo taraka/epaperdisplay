@@ -1,5 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::c_char;
+use crate::epd::paint::Dot_Pixel::DOT_PIXEL_1X1;
+use crate::epd::paint::Dot_Style::DOT_FILL_AROUND;
 
 
 extern {
@@ -251,45 +253,6 @@ impl Image {
                 self.draw_point(x as u16, y as u16, color, line_width, Dot_Style::DOT_FILL_AROUND);
             }
         }
-
-//
-//        let dx = if x_end as i16 - x_start  as i16 >= 0 { x_end as i16 - x_start as i16 } else { x_start as i16 - x_end as i16 };
-//        let dy = if y_end as i16 - y_start as i16 >= 0 { y_end as i16 - y_start as i16 } else { y_start as i16 - y_end as i16 };
-//
-//        //Cumulative error
-//        let mut esp = dx + dy;
-//        let mut dotted_len: u16 = 0;
-//
-//        let mut x_point= x_start;
-//        let mut y_point = y_start;
-//
-//        loop {
-//            println!("dx: {:>5} , dy: {:>5}, esp: {:>5}, dotted_len: {:>5}, x_point: {:>5}, y_point: {:>5}", dx, dy, esp, dotted_len, x_point, y_point);
-//            dotted_len += 1;
-//            //Painted dotted line, 2 point is really virtual
-//
-//            if line_style == Line_Style::LINE_STYLE_DOTTED && dotted_len % 3 == 0 {
-//                self.draw_point(x_point, y_point, self.color, line_width, Dot_Style::DOT_FILL_AROUND);
-//                dotted_len = 0;
-//            } else {
-//                self.draw_point(x_point, y_point, color, line_width, Dot_Style::DOT_FILL_AROUND);
-//            }
-//
-//            if 2*esp >= dy {
-//                if x_point == x_end {
-//                    break;
-//                }
-//                esp += dy;
-//                x_point = if x_start < x_end { x_point + 1 } else { x_point - 1 };
-//            }
-//            if 2*esp <= dx {
-//                if y_point == y_end {
-//                    break;
-//                }
-//                esp += dx;
-//                y_point = if y_start < y_end { y_point + 1 } else { y_point - 1 };
-//            }
-//        }
     }
 
 
@@ -299,17 +262,71 @@ impl Image {
             return;
         }
 
-            if draw_fill == Draw_Fill::DRAW_FILL_FULL {
+        if draw_fill == Draw_Fill::DRAW_FILL_FULL {
 
-                for y_point in y_start..y_end {
-                    self.draw_line(x_start, y_point, x_end, y_point, color , line_width, Line_Style::LINE_STYLE_SOLID);
-                }
-            } else {
-                self.draw_line(x_start, y_start, x_end, y_start, color, line_width, Line_Style::LINE_STYLE_SOLID);
-                self.draw_line(x_start, y_start, x_start, y_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
-                self.draw_line(x_end, y_end, x_end, y_start, color, line_width, Line_Style::LINE_STYLE_SOLID);
-                self.draw_line(x_start, y_end, x_end , y_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
+            for y_point in y_start..y_end {
+                self.draw_line(x_start, y_point, x_end, y_point, color , line_width, Line_Style::LINE_STYLE_SOLID);
             }
+        } else {
+            self.draw_line(x_start, y_start, x_end, y_start, color, line_width, Line_Style::LINE_STYLE_SOLID);
+            self.draw_line(x_start, y_start, x_start, y_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
+            self.draw_line(x_end, y_end, x_end, y_start, color, line_width, Line_Style::LINE_STYLE_SOLID);
+            self.draw_line(x_start, y_end, x_end , y_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
+        }
+    }
 
+    pub fn draw_circle(&mut self, x_center: u16, y_center: u16, radius: u16, color: Color, line_width: Dot_Pixel, draw_fill: Draw_Fill) {
+        if x_center > self.width || y_center >= self.height {
+            return;
+        }
+
+        let mut x  = 0;
+        let mut y = radius;
+
+        //Cumulative error,judge the next point of the logo
+        let mut esp = 3 - (radius << 1 ) as i32;
+
+        if draw_fill == Draw_Fill::DRAW_FILL_FULL {
+            while x <= y { //Realistic circles
+                for cy in x..y+1 {
+                    self.draw_point(x_center + x, y_center + cy, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//1
+                    self.draw_point(x_center - x, y_center + cy, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//2
+                    self.draw_point(x_center - cy, y_center + x, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//3
+                    self.draw_point(x_center - cy, y_center - x, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//4
+                    self.draw_point(x_center - x, y_center - cy, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//5
+                    self.draw_point(x_center + x, y_center - cy, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//6
+                    self.draw_point(x_center + cy, y_center - x, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//7
+                    self.draw_point(x_center + cy, y_center + x, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);
+                }
+                if esp < 0 {
+                    esp += 4 * x as i32 + 6;
+                }
+                else {
+                    esp += 10 + 4 * (x as i32 - y as i32);
+                    y -= 1;
+                }
+                x += 1;
+            }
+        } else { //Draw a hollow circle
+            while x <= y {
+                self.draw_point(x_center + x, y_center + y, color, line_width, DOT_FILL_AROUND);//1
+                self.draw_point(x_center - x, y_center + y, color, line_width, DOT_FILL_AROUND);//2
+                self.draw_point(x_center - y, y_center + x, color, line_width, DOT_FILL_AROUND);//3
+                self.draw_point(x_center - y, y_center - x, color, line_width, DOT_FILL_AROUND);//4
+                self.draw_point(x_center - x, y_center - y, color, line_width, DOT_FILL_AROUND);//5
+                self.draw_point(x_center + x, y_center - y, color, line_width, DOT_FILL_AROUND);//6
+                self.draw_point(x_center + y, y_center - x, color, line_width, DOT_FILL_AROUND);//7
+                self.draw_point(x_center + y, y_center + x, color, line_width, DOT_FILL_AROUND);//0
+
+                if esp < 0 {
+                    esp += 4 * x as i32 + 6;
+                }
+                else {
+                    esp += 10 + 4 * (x as i32 - y as i32);
+                    y -= 1;
+                }
+                x += 1;
+            }
+        }
     }
 }
