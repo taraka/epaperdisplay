@@ -70,7 +70,7 @@ fn draw_stuff() {
 
       println!("EPD_Display");
       epd::display::d7in5_v2::display(&image);
-      epd::device::delay_ms(2000);
+      epd::device::delay_ms(5000);
 
       println!("Clear...");
       //epd::display::d7in5_v2::clear();

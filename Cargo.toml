@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["TaRaKa <git@tomrawcliffe.co.uk>"]
 edition = "2018"
 
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -11,3 +12,7 @@ edition = "2018"
 [build-dependencies]
 cc = "1.0"
 line_drawing = "0.8.0"
+
+
+[target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
+orbclient = "0.3.27"
