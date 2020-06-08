@@ -317,6 +317,7 @@ impl Image {
         let mut y = y_start;
 
         for (_, c) in string.chars().enumerate() {
+            //println!("x: {:<5}, y: {:<5}, c: {}, font_width: {:<3}, font_height: {}", x, y, c, font.width, font.height);
             //if X direction filled , reposition to(Xstart,Ypoint),Ypoint is Y direction plus the Height of the character
             if (x + font.width ) > self.width {
                 x = x_start;
@@ -324,7 +325,7 @@ impl Image {
             }
 
             // If the Y direction is full, reposition to(Xstart, Ystart)
-            if (y  + self.height ) > self.height {
+            if (y  + font.height ) > self.height {
                 x = x_start;
                 y = y_start;
             }
@@ -371,6 +372,10 @@ impl Image {
                 offset += 1;
             }
         }// Write all
+    }
+
+    pub fn draw_num(&mut self, x_start: u16, y_start: u16, number: i32, font: Box<Font>, fg_color: Color, bg_color: Color) {
+        self.draw_string(x_start, y_start, &format!("{}", number)[..], font, fg_color, bg_color)
     }
 
 }
