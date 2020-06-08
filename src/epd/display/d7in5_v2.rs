@@ -8,17 +8,28 @@ pub fn clear() {
     let my_width = WIDTH / 8;
 
     send_command(0x10);
-    for i in 0..(HEIGHT*my_width) {
+    for _i in 0..(HEIGHT*my_width) {
         send_data(0x00);
     }
     send_command(0x13);
-    for i in 0..(HEIGHT*my_width)	{
+    for _i in 0..(HEIGHT*my_width)	{
         send_data(0x00);
     }
     turn_on_display();
 }
 
-pub fn display(image: &mut Image) {
+pub fn clear_black() {
+    let my_width = WIDTH / 8;
+
+    send_command(0x13);
+    for _i in 0..(HEIGHT*my_width) {
+        send_data(0xff);
+    }
+
+    turn_on_display();
+}
+
+pub fn display(image: &Image) {
     let my_width = WIDTH / 8;
 
     send_command(0x13);

@@ -46,7 +46,7 @@ fn draw_stuff() {
 
       println!("SelectImage:BlackImage");
       //epd::paint::select_image(&mut black_image);
-      epd::paint::clear(epd::paint::Color::White);
+      image.clear(epd::paint::Color::White);
 
       // 2.Drawing on the image
       println!("Drawing:BlackImage");
@@ -69,7 +69,7 @@ fn draw_stuff() {
       // epd::paint::draw_num(10, 50, 987654321, epd::paint::font16(), epd::paint::Color::White, epd::paint::Color::Black);
 
       println!("EPD_Display");
-      epd::display::d7in5_v2::display(&mut black_image);
+      epd::display::d7in5_v2::display(&image);
       epd::device::delay_ms(2000);
 
       println!("Clear...");

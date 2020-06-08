@@ -1,6 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::c_char;
 
+
 extern {
     fn Paint_NewImage(image: *mut u8, width: u16, height: u16, rotate: u16, color: u16);
     fn Paint_SelectImage(image: *mut u8);
@@ -37,12 +38,13 @@ extern "C" {
 
 pub type ImageData = Box<[u8]>;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Color {
     White = 0xff,
     Black = 0x00
 }
 
+#[derive(Clone, Copy, PartialEq)]
 enum Mirror {
     NONE  = 0,
     HORIZONTAL = 1,
@@ -51,7 +53,7 @@ enum Mirror {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Dot_Pixel {
     DOT_PIXEL_1X1  = 1,
     DOT_PIXEL_2X2,
@@ -64,6 +66,7 @@ pub enum Dot_Pixel {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Rotation {
     R0  = 0,
     R90 = 90,
@@ -72,18 +75,21 @@ pub enum Rotation {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Dot_Style {
     DOT_FILL_AROUND  = 1,		// dot pixel 1 x 1
     DOT_FILL_RIGHTUP  , 		// dot pixel 2 X 2
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Line_Style {
     LINE_STYLE_SOLID = 0,
     LINE_STYLE_DOTTED,
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Draw_Fill {
     DRAW_FILL_EMPTY = 0,
     DRAW_FILL_FULL,
@@ -94,8 +100,8 @@ pub enum Draw_Fill {
 pub struct Font
 {
     table: *const u8,
-    Width: u16,
-    Height: u16
+    width: u16,
+    height: u16
 }
 
 pub fn new_image(width: u16, height: u16, color: Color) -> Image {
@@ -161,8 +167,8 @@ impl Image {
 
     pub fn clear(&mut self, color: Color) {
             for y in  0..self.height_byte {
-                for x in 0..self.height_byte {//8 pixel =  1 byte
-                    self.image[( x + y * self.width_byte) as usize] = Color;
+                for x in 0..self.width_byte {//8 pixel =  1 byte
+                    self.image[( x + y * self.width_byte) as usize] = color as u8;
                 }
         }
     }
@@ -175,19 +181,19 @@ impl Image {
         let dot_size = dot_pixel as u16;
 
         if dot_style == Dot_Style::DOT_FILL_AROUND {
-            for xdir_num in 0..2 * Dot_Pixel - 1 {
-                for ydir_num in 0..2 * Dot_Pixel - 1 {
-                    if x_point + xdir_num - dot_size < 0 || y_point + ydir_num - dot_size < 0 {
+            for xdir_num in 0..2 * dot_pixel as u16 - 1 {
+                for ydir_num in 0..2 * dot_pixel as u16 - 1 {
+                    if (x_point as i32 + xdir_num as i32 - dot_size as i32) < 0 || (y_point as i32 + ydir_num as i32 - dot_size as i32) < 0 {
                         break;
                     }
                     // printf("x = %d, y = %d\r\n", Xpoint + XDir_Num - Dot_Pixel, Ypoint + YDir_Num - Dot_Pixel);
-                    self.set_pixel(x_point + xdir_num - dot_size, y_point + ydir_num - dot_size, Color);
+                    self.set_pixel(x_point + xdir_num - dot_size, y_point + ydir_num - dot_size, color);
                 }
             }
         } else {
             for xdir_num in  0..dot_size {
                 for ydir_num in 0..dot_size {
-                    self.set_pixel(x_point + xdir_num - 1, y_point + ydir_num - 1, Color);
+                    self.set_pixel(x_point + xdir_num - 1, y_point + ydir_num - 1, color);
                 }
             }
         }
@@ -218,12 +224,12 @@ impl Image {
             return;
         }
 
-        let addr: u16 =  x / 8 + y * self.width_byte;
-        let currentData: u8 = self.image[addr];
+        let addr =  (x / 8 + y * self.width_byte) as usize;
+        let current_data: u8 = self.image[addr];
 
         self.image[addr] = match color {
-            Color::Black => currentData & !(0x80 >> (x % 8) as u8 ),
-            Color::White =>  currentData | (0x80 >> (x % 8) as u8 )
+            Color::Black => current_data & !(0x80 >> (x % 8) as u8 ),
+            Color::White =>  current_data | (0x80 >> (x % 8) as u8 )
         }
 
     }
@@ -234,45 +240,56 @@ impl Image {
             return;
         }
 
-        let dx = if x_end - x_start >= 0 { x_end - x_start } else { x_start - x_end };
-        let dy = if y_end - y_start <= 0 { y_end - y_start } else { y_start - y_end };
+        let mut dotted_len: u16 = 0;
 
-        let x_addway = if x_start < x_end { 1 } else { -1 };
-        let y_addway = if y_start < y_end { 1 } else { -1 };
-
-        //Cumulative error
-        let mut esp = dx + dy;
-        let mut dotted_len: u8 = 0;
-
-        let mut x_point= x_start;
-        let mut y_point = y_start;
-
-        loop {
-            dotted_len = dotted_len + 1;
-            //Painted dotted line, 2 point is really virtual
-
+        for (x, y) in crate::epd::bresenham::Bresenham::new((x_start as isize, y_start as isize), (x_end as isize, y_end as isize)) {
+            dotted_len += 1;
             if line_style == Line_Style::LINE_STYLE_DOTTED && dotted_len % 3 == 0 {
-                self.draw_point(x_point, y_point, self.color, line_width, Dot_Style::DOT_FILL_AROUND);
-                Dotted_Len = 0;
+                self.draw_point(x as u16, y as u16, self.color, line_width, Dot_Style::DOT_FILL_AROUND);
+                dotted_len = 0;
             } else {
-                self.draw_point(x_point, y_point, color, line_width, Dot_Style::DOT_FILL_AROUND);
-            }
-
-            if 2 * esp >= dy {
-                if x_point == x_end {
-                    break;
-                }
-                esp += dy;
-                x_point = x_point + x_addway;
-            }
-            if 2 * Esp <= dx {
-                if y_point == y_end {
-                    break;
-                }
-                esp += dx;
-                y_point += y_addway;
+                self.draw_point(x as u16, y as u16, color, line_width, Dot_Style::DOT_FILL_AROUND);
             }
         }
+
+//
+//        let dx = if x_end as i16 - x_start  as i16 >= 0 { x_end as i16 - x_start as i16 } else { x_start as i16 - x_end as i16 };
+//        let dy = if y_end as i16 - y_start as i16 >= 0 { y_end as i16 - y_start as i16 } else { y_start as i16 - y_end as i16 };
+//
+//        //Cumulative error
+//        let mut esp = dx + dy;
+//        let mut dotted_len: u16 = 0;
+//
+//        let mut x_point= x_start;
+//        let mut y_point = y_start;
+//
+//        loop {
+//            println!("dx: {:>5} , dy: {:>5}, esp: {:>5}, dotted_len: {:>5}, x_point: {:>5}, y_point: {:>5}", dx, dy, esp, dotted_len, x_point, y_point);
+//            dotted_len += 1;
+//            //Painted dotted line, 2 point is really virtual
+//
+//            if line_style == Line_Style::LINE_STYLE_DOTTED && dotted_len % 3 == 0 {
+//                self.draw_point(x_point, y_point, self.color, line_width, Dot_Style::DOT_FILL_AROUND);
+//                dotted_len = 0;
+//            } else {
+//                self.draw_point(x_point, y_point, color, line_width, Dot_Style::DOT_FILL_AROUND);
+//            }
+//
+//            if 2*esp >= dy {
+//                if x_point == x_end {
+//                    break;
+//                }
+//                esp += dy;
+//                x_point = if x_start < x_end { x_point + 1 } else { x_point - 1 };
+//            }
+//            if 2*esp <= dx {
+//                if y_point == y_end {
+//                    break;
+//                }
+//                esp += dx;
+//                y_point = if y_start < y_end { y_point + 1 } else { y_point - 1 };
+//            }
+//        }
     }
 
 
@@ -288,10 +305,10 @@ impl Image {
                     self.draw_line(x_start, y_point, x_end, y_point, color , line_width, Line_Style::LINE_STYLE_SOLID);
                 }
             } else {
-                self.draw_line(x_start, y_start, Xend, Ystart, color, line_width, Line_Style::LINE_STYLE_SOLID);
+                self.draw_line(x_start, y_start, x_end, y_start, color, line_width, Line_Style::LINE_STYLE_SOLID);
                 self.draw_line(x_start, y_start, x_start, y_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
                 self.draw_line(x_end, y_end, x_end, y_start, color, line_width, Line_Style::LINE_STYLE_SOLID);
-                self.draw_line(x_end, y_end, x_start, e_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
+                self.draw_line(x_start, y_end, x_end , y_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
             }
 
     }
