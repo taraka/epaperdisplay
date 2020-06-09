@@ -4,79 +4,93 @@ use crate::epd::device::*;
 pub const WIDTH: u16 = 800;
 pub const HEIGHT: u16 = 480;
 
-pub fn clear() {
-    let my_width = WIDTH / 8;
+pub struct Display {
 
-    send_command(0x10);
-    for _i in 0..(HEIGHT*my_width) {
-        send_data(0x00);
-    }
-    send_command(0x13);
-    for _i in 0..(HEIGHT*my_width)	{
-        send_data(0x00);
-    }
-    turn_on_display();
 }
 
-pub fn clear_black() {
-    let my_width = WIDTH / 8;
+impl Display {
+    pub fn init() -> Display {
 
-    send_command(0x13);
-    for _i in 0..(HEIGHT*my_width) {
-        send_data(0xff);
+        module_init().expect("Fail to init device with code: {}")
+
+        reset();
+
+        send_command(0x01);			//POWER SETTING
+        send_data(0x07);
+        send_data(0x07);    //VGH=20V,VGL=-20V
+        send_data(0x3f);		//VDH=15V
+        send_data(0x3f);		//VDL=-15V
+
+        send_command(0x04); //POWER ON
+        delay_ms(100);
+        wait_until_idle();
+
+        send_command(0x00);			//PANNEL SETTING
+        send_data(0x1F);   //KW-3f   KWR-2F	BWROTP 0f	BWOTP 1f
+
+        send_command(0x61);        	//tres
+        send_data(0x03);		//source 800
+        send_data(0x20);
+        send_data(0x01);		//gate 480
+        send_data(0xE0);
+
+        send_command(0x15);
+        send_data(0x00);
+
+        send_command(0x50);			//VCOM AND DATA INTERVAL SETTING
+        send_data(0x10);
+        send_data(0x07);
+
+        send_command(0x60);			//TCON SETTING
+        send_data(0x22);
+
+        return Display {}
     }
 
-    turn_on_display();
-}
 
-pub fn display(image: &Image) {
-    let my_width = WIDTH / 8;
+    pub fn display(self, image: &Image) {
+        let my_width = WIDTH / 8;
 
-    send_command(0x13);
-    for j in 0..HEIGHT {
-        for i in 0..my_width {
-            send_data(!image.image[(i + j * my_width) as usize]);
+        send_command(0x13);
+        for j in 0..HEIGHT {
+            for i in 0..my_width {
+                send_data(!image.image[(i + j * my_width) as usize]);
+            }
         }
+        turn_on_display();
     }
-    turn_on_display();
+
+    pub fn clear(self) {
+        let my_width = WIDTH / 8;
+
+        send_command(0x10);
+        for _i in 0..(HEIGHT*my_width) {
+            send_data(0x00);
+        }
+        send_command(0x13);
+        for _i in 0..(HEIGHT*my_width)	{
+            send_data(0x00);
+        }
+        turn_on_display();
+    }
+
+    pub fn clear_black(self) {
+        let my_width = WIDTH / 8;
+
+        send_command(0x13);
+        for _i in 0..(HEIGHT*my_width) {
+            send_data(0xff);
+        }
+
+        turn_on_display();
+    }
+
+    pub fn update_rate() -> u32 {
+        5000
+    }
 }
 
-
-pub fn init() {
-
-    reset();
-
-    send_command(0x01);			//POWER SETTING
-    send_data(0x07);
-    send_data(0x07);    //VGH=20V,VGL=-20V
-    send_data(0x3f);		//VDH=15V
-    send_data(0x3f);		//VDL=-15V
-
-    send_command(0x04); //POWER ON
-    delay_ms(100);
-    wait_until_idle();
-
-    send_command(0x00);			//PANNEL SETTING
-    send_data(0x1F);   //KW-3f   KWR-2F	BWROTP 0f	BWOTP 1f
-
-    send_command(0x61);        	//tres
-    send_data(0x03);		//source 800
-    send_data(0x20);
-    send_data(0x01);		//gate 480
-    send_data(0xE0);
-
-    send_command(0x15);
-    send_data(0x00);
-
-    send_command(0x50);			//VCOM AND DATA INTERVAL SETTING
-    send_data(0x10);
-    send_data(0x07);
-
-    send_command(0x60);			//TCON SETTING
-    send_data(0x22);
-}
-
-pub fn sleep()
+fn sleep()
 {
     send_command(0x02);  	//power off
     wait_until_idle();
@@ -84,7 +98,7 @@ pub fn sleep()
     send_data(0xA5);
 }
 
-pub fn reset()
+fn reset()
 {
     digital_write(Pin::EPD_RST_PIN, 1);
     delay_ms(200);
