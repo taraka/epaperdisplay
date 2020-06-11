@@ -12,6 +12,7 @@ line_drawing = "0.8.0"
 chan = "0.1.23"
 
 
+
 #google-calendar3 = "*"
 ## This project intentionally uses an old version of Hyper. See
 ## https://github.com/Byron/google-apis-rs/issues/173 for more
@@ -26,4 +27,4 @@ chan = "0.1.23"
 cc = "1.0"
 
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
-orbclient = "0.3.27"
+sdl2 = "0.34.1"

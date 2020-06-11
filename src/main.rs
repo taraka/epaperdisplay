@@ -9,18 +9,14 @@ use epd::paint::Image;
 
 
 fn main() {
-
-
-
       println!("e-Paper Init and Clear...");
       let mut display = Display::init();
       display.clear();
       epd::device::delay_ms(100);
 
+      update(&mut display);
+
       let display_tick = chan::tick_ms(Display::update_rate());
-
-
-
       loop {
             chan_select! {
                   display_tick.recv() => {
