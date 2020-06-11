@@ -27,7 +27,7 @@ impl Display {
             .build()
             .unwrap();
 
-        let mut canvas = window.into_canvas().build().unwrap();
+        let canvas = window.into_canvas().build().unwrap();
 
         Display {
             canvas,
@@ -72,16 +72,6 @@ impl Display {
                 _ => {}
             }
         }
-
-        // self.window.sync();
-        //
-        //
-        // for event in self.window.events() {
-        //     match event.to_option() {
-        //         EventOption::Quit(_quit_event) => std::process::exit(0),
-        //         _ => {},
-        //     }
-        // }
     }
 
     pub fn update_rate() -> u32 {

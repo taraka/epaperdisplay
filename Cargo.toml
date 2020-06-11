@@ -10,18 +10,9 @@ edition = "2018"
 [dependencies]
 line_drawing = "0.8.0"
 chan = "0.1.23"
-
-
-
-#google-calendar3 = "*"
-## This project intentionally uses an old version of Hyper. See
-## https://github.com/Byron/google-apis-rs/issues/173 for more
-## information.
-#hyper = "*"
-#hyper-rustls = "*"
-#serde = "*"
-#serde_json = "*"
-#yup-oauth2 = "*"
+ical = "0.6.0"
+reqwest = { version = "0.10", features = ["blocking"] }
+chrono = "0.4.11"
 
 [build-dependencies]
 cc = "1.0"
