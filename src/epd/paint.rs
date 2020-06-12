@@ -181,8 +181,7 @@ impl Image {
     }
 
     pub fn set_pixel(&mut self, x_point: u16, y_point: u16, color: Color) {
-
-        if x_point > self.width || y_point > self.height {
+        if x_point >= self.width || y_point >= self.height {
             return;
         }
 

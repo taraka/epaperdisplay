@@ -7,16 +7,23 @@ use ical;
 use ical::parser::ParserError;
 use ical::parser::ical::component::IcalCalendar;
 use std::collections::HashMap;
-use chrono::{DateTime, Utc, Local, TimeZone, NaiveDateTime, FixedOffset, Duration};
+use chrono::{DateTime, Utc, Local, TimeZone, NaiveDateTime, FixedOffset, Duration, Datelike};
 use std::borrow::Borrow;
-use std::ops::Sub;
+use std::ops::{Sub, Add};
+
+#[derive(PartialEq)]
+enum Repeat {
+      NONE,
+      YEARLY
+}
 
 struct Event {
       name: String,
       location: Option<String>,
       start: DateTime<Utc>,
       end: DateTime<Utc>,
-      allday: bool
+      all_day: bool,
+      repeat: Repeat
 }
 
 
@@ -61,7 +68,13 @@ fn fetch_data() -> Vec<Event> {
             }
 
             if  props.contains_key("SUMMARY") && props.contains_key("DTEND") && props.contains_key("DTSTART") {
-                  let (start, allday) = unpack_time_stamp(props.get("DTSTART"));
+                  let repeat = get_repeat(props.get("RRULE"));
+
+                  let (start, all_day) = unpack_time_stamp(props.get("DTSTART"), &repeat);
+                  let (end, _) = unpack_time_stamp(props.get("DTEND"), &repeat);
+
+
+
                   output.push(Event {
                         name: props.get("SUMMARY").unwrap().clone(),
                         location: match props.get("LOCATION") {
@@ -69,8 +82,9 @@ fn fetch_data() -> Vec<Event> {
                               None => None
                         },
                         start,
-                        end: unpack_time_stamp(props.get("DTEND")).0,
-                        allday
+                        end,
+                        all_day,
+                        repeat
                   });
             }
 
@@ -80,7 +94,21 @@ fn fetch_data() -> Vec<Event> {
       let today = now.sub(Duration::seconds(now.timestamp() % 86400));
 
       let mut output = output.into_iter().filter(|e| {
-            e.start >= today
+            e.start >= today || e.repeat != Repeat::NONE
+      }).map(|e| {
+            match e.repeat {
+                  Repeat::NONE => e,
+                  Repeat::YEARLY => {
+                        Event {
+                              name: e.name,
+                              location: e.location,
+                              start: find_next_yearly_instance(&e.start),
+                              end: find_next_yearly_instance(&e.end),
+                              all_day: e.all_day,
+                              repeat: e.repeat
+                        }
+                  }
+            }
       }).collect::<Vec<Event>>();
 
       output.sort_by(|a, b| {
@@ -90,51 +118,83 @@ fn fetch_data() -> Vec<Event> {
       output
 }
 
-fn unpack_time_stamp(input: Option<&String>) -> (DateTime<Utc>, bool) {
+fn find_next_yearly_instance(dt: &DateTime<Utc>) -> DateTime<Utc> {
+      let mut mydt = dt.clone();
+      while mydt < Utc::now() {
+            mydt = mydt.with_year(mydt.year() + 1).unwrap()
+      }
+      return mydt;
+}
+
+fn get_repeat(rrule: Option<&String>) -> Repeat {
+      match rrule {
+            Some(rule) => {
+                  if rule == "FREQ=YEARLY" {
+                        Repeat::YEARLY
+                  } else {
+                        Repeat::NONE
+                  }
+            },
+            None => Repeat::NONE
+      }
+}
+
+fn unpack_time_stamp(input: Option<&String>, repeat: &Repeat) -> (DateTime<Utc>, bool) {
       const FORMAT: &str = "%Y%m%dT%H%M%SZ%z";
       let input_string = input.unwrap();
 
-      match DateTime::parse_from_str(&format!("{}{}", input_string, "+0000")[..], FORMAT) {
+      let values = match DateTime::parse_from_str(&format!("{}{}", input_string, "+0000")[..], FORMAT) {
             Ok(d) => (d.with_timezone(&Utc), false),
             Err(_) => match DateTime::parse_from_str(&format!("{}{}", input_string, "Z+0000")[..], FORMAT) {
                   Ok(d1) => (d1.with_timezone(&Utc), false),
                   Err(_) => (DateTime::parse_from_str(&format!("{}{}", input_string, "T000000Z+0000")[..], FORMAT).unwrap().with_timezone(&Utc), true)
             }
-      }
+      };
+
+      (values.0, values.1)
 }
 
 fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
-
-      //println!("Printing Cal {}", cal.len());
-      //
-      // for e in cal {
-      //       println!("{:?}, {:?}", e.name, e.start);
-      // }
-
-
-      //println!("{:?}, {:?}", cal.first().unwrap().name, cal.first().unwrap().start);
-
-
-
-
       let mut image = epd::paint::new_image(epd::display::d7in5_v2::WIDTH, epd::display::d7in5_v2::HEIGHT, epd::paint::Color::White);
 
       image.clear(epd::paint::Color::White);
 
       let mut y: u16 = 20;
       for e in cal {
-            let time = match e.allday {
-                  true => format!("{} - {}", e.start.format("%d-%m-%y"), e.end.format("%d-%m-%y")),
-                  false => format!("{} - {}", e.start.format("%d-%m-%y %H:%M"), e.end.format("%H:%M"))
+            let end = match e.all_day {
+                  true => e.end.sub(Duration::seconds(1)),
+                  false => e.end
             };
 
-            let (_, next_y) = image.draw_string(20, y+10, &format!("{}:  {}", e.name, time)[..], epd::paint::font20(), epd::paint::Color::Black, epd::paint::Color::White);
+            let time = match e.all_day {
+                  true => {
+                        if e.start.date() == end.date() {
+                              format!("{}", e.start.format("%d-%m-%y"))
+                        }
+                        else {
+                              format!("{} - {}", e.start.format("%d-%m-%y"), end.format("%d-%m-%y"))
+                        }
+                  },
+                  false => {
+                        if e.start.date() == end.date() {
+                              format!("{} - {}", e.start.format("%d-%m-%y %H:%M"), end.format("%H:%M"))
+                        }
+                        else {
+                              format!("{} - {}", e.start.format("%d-%m-%y %H:%M"), end.format("%d-%m-%y %H:%M"))
+                        }
+                  }
+            };
+
+
+            let (_, next_y) = image.draw_string(20, y+20, &format!("{}:  {}", e.name, time)[..], epd::paint::font20(), epd::paint::Color::Black, epd::paint::Color::White);
             y = next_y;
 
             if e.location != None {
-                  let (_, next_y) = image.draw_string(20, y, &e.location.as_ref().unwrap()[..], epd::paint::font12(), epd::paint::Color::Black, epd::paint::Color::White);
+                  let (_, next_y) = image.draw_string(20, y, &e.location.as_ref().unwrap().replace("\\n", ", ").replace("\\", " ")[..], epd::paint::font12(), epd::paint::Color::Black, epd::paint::Color::White);
                   y = next_y;
             }
+
+            image.draw_line(10, y+10, 790, y+10, epd::paint::Color::Black, epd::paint::Dot_Pixel::DOT_PIXEL_1X1, epd::paint::Line_Style::LINE_STYLE_DOTTED);
       }
 
       // // 2.Drawing on the image
