@@ -57,7 +57,7 @@ impl Display {
                 } else {
                     canvas.set_draw_color(Color::RGB(255, 255, 255));
                 }
-                canvas.draw_point(Point::new(x as i32, y as i32));
+                canvas.draw_point(Point::new(x as i32, y as i32)).unwrap();
             }
         }
 

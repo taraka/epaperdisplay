@@ -30,12 +30,6 @@
 //! (4, 3)
 //! (5, 3)
 //! ```
-
-#![no_std]
-
-#[cfg(test)]
-extern crate std;
-
 use core::iter::Iterator;
 
 /// Convenient typedef for two machines-sized integers

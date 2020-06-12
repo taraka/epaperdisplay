@@ -97,8 +97,8 @@ pub enum Draw_Fill {
 pub struct Font
 {
     table: *const u8,
-    width: u16,
-    height: u16
+    pub width: u16,
+    pub height: u16
 }
 
 pub fn new_image(width: u16, height: u16, color: Color) -> Image {
@@ -309,16 +309,16 @@ impl Image {
         }
     }
 
-    pub fn draw_string(&mut self, x_start: u16, y_start: u16, string: &str, font: Box<Font>, fg_color: Color, bg_color: Color) {
+    pub fn draw_string(&mut self, x_start: u16, y_start: u16, string: &str, font: Box<Font>, fg_color: Color, bg_color: Color) -> (u16, u16){
         if x_start > self.width || y_start > self.height {
-            return;
+            return (x_start, y_start);
         }
 
         let mut x = x_start;
         let mut y = y_start;
+        let mut max_x = x;
 
         for (_, c) in string.chars().enumerate() {
-            //println!("x: {:<5}, y: {:<5}, c: {}, font_width: {:<3}, font_height: {}", x, y, c, font.width, font.height);
             //if X direction filled , reposition to(Xstart,Ypoint),Ypoint is Y direction plus the Height of the character
             if (x + font.width ) > self.width {
                 x = x_start;
@@ -334,7 +334,12 @@ impl Image {
 
             //The next word of the abscissa increases the font of the broadband
             x += font.width;
+            if x > max_x {
+                max_x = x;
+            }
         }
+
+        (max_x + font.width, y + font.height)
     }
 
     pub fn draw_char(&mut self, x_start: u16, y_start: u16, c: char, font: &Box<Font>, fg_color: Color, bg_color: Color) {
@@ -376,7 +381,7 @@ impl Image {
     }
 
     pub fn draw_num(&mut self, x_start: u16, y_start: u16, number: i32, font: Box<Font>, fg_color: Color, bg_color: Color) {
-        self.draw_string(x_start, y_start, &format!("{}", number)[..], font, fg_color, bg_color)
+        self.draw_string(x_start, y_start, &format!("{}", number)[..], font, fg_color, bg_color);
     }
 
 }
