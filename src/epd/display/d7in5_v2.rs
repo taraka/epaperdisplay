@@ -11,7 +11,7 @@ pub struct Display {
 impl Display {
     pub fn init() -> Display {
 
-        module_init().expect("Fail to init device with code: {}")
+        module_init().expect("Fail to init device with code: {}");
 
         reset();
 
@@ -48,7 +48,7 @@ impl Display {
     }
 
 
-    pub fn display(self, image: &Image) {
+    pub fn display(&mut self, image: Image) {
         let my_width = WIDTH / 8;
 
         send_command(0x13);
@@ -60,7 +60,7 @@ impl Display {
         turn_on_display();
     }
 
-    pub fn clear(self) {
+    pub fn clear(&self) {
         let my_width = WIDTH / 8;
 
         send_command(0x10);
@@ -74,7 +74,7 @@ impl Display {
         turn_on_display();
     }
 
-    pub fn clear_black(self) {
+    pub fn clear_black(&self) {
         let my_width = WIDTH / 8;
 
         send_command(0x13);
