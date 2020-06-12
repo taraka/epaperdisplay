@@ -86,7 +86,7 @@ impl Display {
     }
 
     pub fn update_rate() -> u32 {
-        5000
+        15 * 60 * 1000 //15 mins
     }
 }
 

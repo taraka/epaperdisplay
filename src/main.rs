@@ -38,7 +38,7 @@ fn main() {
       let mut cal = fetch_data();
       draw_cal(&mut display, &cal);
 
-      let fetch_tick = chan::tick_ms(60000);
+      let fetch_tick = chan::tick_ms(5 * 60 * 1000);
       let display_tick = chan::tick_ms(Display::update_rate());
       loop {
             chan_select! {
