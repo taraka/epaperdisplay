@@ -159,42 +159,44 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
 
       image.clear(epd::paint::Color::White);
 
-      let mut y: u16 = 20;
+      image.draw_line(105, 10, 105, 470, epd::paint::Color::Black, epd::paint::Dot_Pixel::DOT_PIXEL_1X1, epd::paint::Line_Style::LINE_STYLE_DOTTED);
+
+
+      let mut y: u16 = 10;
       for e in cal {
             let end = match e.all_day {
                   true => e.end.sub(Duration::seconds(1)),
                   false => e.end
             };
 
-            let time = match e.all_day {
-                  true => {
-                        if e.start.date() == end.date() {
-                              format!("{}", e.start.format("%d-%m-%y"))
-                        }
-                        else {
-                              format!("{} - {}", e.start.format("%d-%m-%y"), end.format("%d-%m-%y"))
-                        }
-                  },
-                  false => {
-                        if e.start.date() == end.date() {
-                              format!("{} - {}", e.start.format("%d-%m-%y %H:%M"), end.format("%H:%M"))
-                        }
-                        else {
-                              format!("{} - {}", e.start.format("%d-%m-%y %H:%M"), end.format("%d-%m-%y %H:%M"))
-                        }
-                  }
-            };
+            let start_date = format!("{}", e.start.format("%d/%m/%y"));
+            let end_date = format!("{}", e.end.format("%d/%m/%y"));
 
 
-            let (_, next_y) = image.draw_string(20, y+20, &format!("{}:  {}", e.name, time)[..], epd::paint::font20(), epd::paint::Color::Black, epd::paint::Color::White);
+            let time = format!("{} - {}", e.start.format("%H:%M"), end.format("%H:%M"));
+
+            let (_, mut date_y) = image.draw_string(10, y, &format!("{}", start_date)[..], epd::paint::font16(), epd::paint::Color::Black, epd::paint::Color::White);
+            if end.date() != e.start.date() {
+                  let (_, end_date_y) = image.draw_string(10, date_y, &format!("{}", end_date)[..], epd::paint::font16(), epd::paint::Color::Black, epd::paint::Color::White);
+                  date_y = end_date_y;
+            }
+
+            if !e.all_day {
+                  let (_, time_y) = image.draw_string(10, date_y + 2, &format!("{}", time)[..], epd::paint::font12(), epd::paint::Color::Black, epd::paint::Color::White);
+                  date_y = time_y
+            }
+            let (_, next_y) = image.draw_string(115, y, &format!("{}", e.name)[..], epd::paint::font20(), epd::paint::Color::Black, epd::paint::Color::White);
             y = next_y;
 
             if e.location != None {
-                  let (_, next_y) = image.draw_string(20, y, &e.location.as_ref().unwrap().replace("\\n", ", ").replace("\\", " ")[..], epd::paint::font12(), epd::paint::Color::Black, epd::paint::Color::White);
+                  let (_, next_y) = image.draw_string(115, y+2, &e.location.as_ref().unwrap().replace("\\n", ", ").replace("\\", " ")[..], epd::paint::font12(), epd::paint::Color::Black, epd::paint::Color::White);
                   y = next_y;
             }
 
-            image.draw_line(10, y+10, 790, y+10, epd::paint::Color::Black, epd::paint::Dot_Pixel::DOT_PIXEL_1X1, epd::paint::Line_Style::LINE_STYLE_DOTTED);
+            y = if y > date_y { y } else { date_y };
+
+            image.draw_line(10, y+8, 790, y+8, epd::paint::Color::Black, epd::paint::Dot_Pixel::DOT_PIXEL_1X1, epd::paint::Line_Style::LINE_STYLE_DOTTED);
+            y+=16
       }
 
       // // 2.Drawing on the image

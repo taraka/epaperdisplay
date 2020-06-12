@@ -309,7 +309,7 @@ impl Image {
     }
 
     pub fn draw_string(&mut self, x_start: u16, y_start: u16, string: &str, font: Box<Font>, fg_color: Color, bg_color: Color) -> (u16, u16){
-        if x_start > self.width || y_start > self.height {
+        if x_start > self.width || y_start + font.height > self.height {
             return (x_start, y_start);
         }
 
@@ -331,7 +331,6 @@ impl Image {
             }
             self.draw_char(x, y, c, &font, fg_color, bg_color);
 
-            //The next word of the abscissa increases the font of the broadband
             x += font.width;
             if x > max_x {
                 max_x = x;
