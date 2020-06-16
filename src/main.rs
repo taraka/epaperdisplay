@@ -31,7 +31,7 @@ fn main() {
       println!("e-Paper Init and Clear...");
       let mut display = Display::init();
       display.clear();
-      epd::device::delay_ms(100);
+      //epd::device::delay_ms(100);
 
 
 

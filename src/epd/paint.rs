@@ -1,14 +1,9 @@
+extern crate bresenham;
+
 use std::ffi::CString;
 use std::os::raw::c_char;
 use crate::epd::paint::Dot_Pixel::DOT_PIXEL_1X1;
 use crate::epd::paint::Dot_Style::DOT_FILL_AROUND;
-
-
-extern {
-    fn Paint_DrawBitMap(image: *const u8);
-    fn Paint_DrawNum(x_start: u16, y_start: u16, string: i32, font: *const Font, fg_color: u16, bg_color: u16);
-
-}
 
 
 pub struct Image {
@@ -23,6 +18,15 @@ pub struct Image {
     width_byte: u16,
     height_byte: u16,
     scale: u16
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct Font
+{
+    table: *const u8,
+    pub width: u16,
+    pub height: u16
 }
 
 extern "C" {
@@ -49,7 +53,6 @@ enum Mirror {
     ORIGIN = 3,
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Dot_Pixel {
     DOT_PIXEL_1X1  = 1,
@@ -62,7 +65,6 @@ pub enum Dot_Pixel {
     DOT_PIXEL_8X8,
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Rotation {
     R0  = 0,
@@ -71,35 +73,25 @@ pub enum Rotation {
     R270 = 270
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Dot_Style {
     DOT_FILL_AROUND  = 1,		// dot pixel 1 x 1
     DOT_FILL_RIGHTUP  , 		// dot pixel 2 X 2
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Line_Style {
     LINE_STYLE_SOLID = 0,
     LINE_STYLE_DOTTED,
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Draw_Fill {
     DRAW_FILL_EMPTY = 0,
     DRAW_FILL_FULL,
 }
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct Font
-{
-    table: *const u8,
-    pub width: u16,
-    pub height: u16
-}
+
 
 pub fn new_image(width: u16, height: u16, color: Color) -> Image {
 
@@ -118,14 +110,6 @@ pub fn new_image(width: u16, height: u16, color: Color) -> Image {
         width,
         height
     }
-}
-
-pub fn draw_bitmap(image: Box<[u8]>) {
-    unsafe { Paint_DrawBitMap(image.as_ptr()) }
-}
-
-pub fn draw_num(x_start: u16, y_start: u16, number: i32, font: Box<Font>, fg_color: Color, bg_color: Color) {
-    unsafe { Paint_DrawNum(x_start, y_start, number, &*font, fg_color as u16, bg_color as u16) }
 }
 
 pub fn font8() -> Box<Font> {
@@ -222,7 +206,7 @@ impl Image {
 
         let mut dotted_len: u16 = 0;
 
-        for (x, y) in crate::epd::bresenham::Bresenham::new((x_start as isize, y_start as isize), (x_end as isize, y_end as isize)) {
+        for (x, y) in bresenham::Bresenham::new((x_start as isize, y_start as isize), (x_end as isize, y_end as isize)) {
             dotted_len += 1;
             if line_style == Line_Style::LINE_STYLE_DOTTED && dotted_len % 3 == 0 {
                 self.draw_point(x as u16, y as u16, self.color, line_width, Dot_Style::DOT_FILL_AROUND);
