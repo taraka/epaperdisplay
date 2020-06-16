@@ -13,6 +13,7 @@ chan = "0.1.23"
 ical = "0.6.0"
 reqwest = { version = "0.10", features = ["blocking"] }
 chrono = "0.4.11"
+rppal = "0.11.3"
 
 [build-dependencies]
 cc = "1.0"

@@ -1,4 +1,5 @@
 use std::{thread, time};
+use rppal::spi::{Bus, Mode, Segment, SlaveSelect, Spi};
 
 extern {
     fn DEV_Module_Init() -> u8;
@@ -19,6 +20,9 @@ pub enum Pin {
 }
 
 pub fn module_init() -> Result<(), u8> {
+
+    Spi::new(Bus::Spi0, SlaveSelect::Ss0, 10_000_000, Mode::Mode0)?;
+
     match unsafe { DEV_Module_Init() } {
         0 => Ok(()),
         e => Err(e)
