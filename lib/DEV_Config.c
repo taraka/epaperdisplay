@@ -57,7 +57,7 @@ void DEV_Digital_Write(UWORD Pin, UBYTE Value)
 #ifdef USE_DEV_LIB
 	SYSFS_GPIO_Write(Pin, Value);
 #elif USE_HARDWARE_LIB
-	Debug("not support");
+//	Debug("not support");
 #endif
 #endif
 }
@@ -79,7 +79,7 @@ UBYTE DEV_Digital_Read(UWORD Pin)
 #ifdef USE_DEV_LIB
 	Read_value = SYSFS_GPIO_Read(Pin);
 #elif USE_HARDWARE_LIB
-	Debug("not support");
+//	Debug("not support");
 #endif
 #endif
 	return Read_value;
@@ -104,7 +104,7 @@ void DEV_SPI_WriteByte(uint8_t Value)
 #ifdef USE_DEV_LIB
 	SYSFS_software_spi_transfer(Value);
 #elif USE_HARDWARE_LIB
-	Debug("not support");
+//	Debug("not support");
 #endif
 #endif
 }
@@ -127,7 +127,7 @@ void DEV_SPI_Write_nByte(uint8_t *pData, uint32_t Len)
 	//JETSON nano waits for hardware SPI
 	Debug("not support");
 #elif USE_HARDWARE_LIB
-	Debug("not support");
+//	Debug("not support");
 #endif
 #endif
 }
@@ -169,7 +169,7 @@ void DEV_GPIO_Mode(UWORD Pin, UWORD Mode)
 	SYSFS_GPIO_Export(Pin);
 	SYSFS_GPIO_Direction(Pin, Mode);
 #elif USE_HARDWARE_LIB
-	Debug("not support");
+//	Debug("not support");
 #endif
 #endif
 }
@@ -209,12 +209,12 @@ static int DEV_Equipment_Testing(void)
     printf("Current environment: ");
 	while(1) {
 		if (fd < 0) {
-			Debug( "Read failed Pin\n");
+//			Debug( "Read failed Pin\n");
 			return -1;
 		}
 		for(i=0;; i++) {
 			if (read(fd, &value_str[i], 1) < 0) {
-				Debug( "failed to read value!\n");
+//				Debug( "failed to read value!\n");
 				return -1;
 			}
 			if(value_str[i] ==32) {
@@ -240,7 +240,7 @@ static int DEV_Equipment_Testing(void)
 #endif
 #ifdef JETSON
 	if(i<5) {
-		Debug("Unrecognizable\r\n");
+//		Debug("Unrecognizable\r\n");
 	} else {
 		char JETSON_System[10]= {"Ubuntu"};
 		for(i=0; i<6; i++) {
@@ -379,7 +379,7 @@ void DEV_Module_Exit(void)
 	SYSFS_GPIO_Unexport(EPD_RST_PIN);
 	SYSFS_GPIO_Unexport(EPD_BUSY_PIN);
 #elif USE_HARDWARE_LIB
-	Debug("not support");
+//	Debug("not support");
 #endif
 #endif
 }

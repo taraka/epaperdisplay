@@ -13,8 +13,6 @@ fn main() {
         .file("lib/DEV_Config.c")
         .file("lib/dev_hardware_SPI.c")
         .file("lib/RPI_sysfs_gpio.c")
-        .file("lib/GUI_Paint.c")
-        .file("lib/GUI_BMPfile.c")
         .file("lib/font12.c")
         .file("lib/font8.c")
         .file("lib/font20.c")
