@@ -24,7 +24,7 @@ impl Pi {
             spi : Spi::new(Bus::Spi0, SlaveSelect::Ss0, 10_000_000, Mode::Mode0).expect("Failed to start SPI bus"),
             reset_pin: Gpio::new().unwrap().get(Pin::EPD_RST_PIN as u8).unwrap().into_output(),
             dc_pin: Gpio::new().unwrap().get(Pin::EPD_DC_PIN as u8).unwrap().into_output(),
-            cs_pin: Gpio::new().unwrap().get(Pin::EPD_DC_PIN as u8).unwrap().into_output(),
+            cs_pin: Gpio::new().unwrap().get(Pin::EPD_CS_PIN as u8).unwrap().into_output(),
             busy_pin: Gpio::new().unwrap().get(Pin::EPD_BUSY_PIN as u8).unwrap().into_input()
         };
 
