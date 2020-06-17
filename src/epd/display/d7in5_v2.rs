@@ -5,144 +5,148 @@ pub const WIDTH: u16 = 800;
 pub const HEIGHT: u16 = 480;
 
 pub struct Display {
-
+    pi: Pi
 }
 
 impl Display {
     pub fn init() -> Display {
 
-        module_init().expect("Fail to init device with code: {}");
+        let mut this = Display {
+            pi: Pi::init()
 
-        reset();
+        };
 
-        send_command(0x01);			//POWER SETTING
-        send_data(0x07);
-        send_data(0x07);    //VGH=20V,VGL=-20V
-        send_data(0x3f);		//VDH=15V
-        send_data(0x3f);		//VDL=-15V
+        this.reset();
 
-        send_command(0x04); //POWER ON
-        delay_ms(100);
-        wait_until_idle();
+        this.send_command(0x01);			//POWER SETTING
+        this.send_data(0x07);
+        this.send_data(0x07);    //VGH=20V,VGL=-20V
+        this.send_data(0x3f);		//VDH=15V
+        this.send_data(0x3f);		//VDL=-15V
 
-        send_command(0x00);			//PANNEL SETTING
-        send_data(0x1F);   //KW-3f   KWR-2F	BWROTP 0f	BWOTP 1f
+        this.send_command(0x04); //POWER ON
+        this.pi.delay_ms(100);
+        this.wait_until_idle();
 
-        send_command(0x61);        	//tres
-        send_data(0x03);		//source 800
-        send_data(0x20);
-        send_data(0x01);		//gate 480
-        send_data(0xE0);
+        this.send_command(0x00);			//PANNEL SETTING
+        this.send_data(0x1F);   //KW-3f   KWR-2F	BWROTP 0f	BWOTP 1f
 
-        send_command(0x15);
-        send_data(0x00);
+        this.send_command(0x61);        	//tres
+        this.send_data(0x03);		//source 800
+        this.send_data(0x20);
+        this.send_data(0x01);		//gate 480
+        this.send_data(0xE0);
 
-        send_command(0x50);			//VCOM AND DATA INTERVAL SETTING
-        send_data(0x10);
-        send_data(0x07);
+        this.send_command(0x15);
+        this.send_data(0x00);
 
-        send_command(0x60);			//TCON SETTING
-        send_data(0x22);
+        this.send_command(0x50);			//VCOM AND DATA INTERVAL SETTING
+        this.send_data(0x10);
+        this.send_data(0x07);
 
-        return Display {}
+        this.send_command(0x60);			//TCON SETTING
+        this.send_data(0x22);
+
+        return this;
     }
 
 
     pub fn display(&mut self, image: Image) {
         let my_width = WIDTH / 8;
 
-        send_command(0x13);
+        self.send_command(0x13);
         for j in 0..HEIGHT {
             for i in 0..my_width {
-                send_data(!image.image[(i + j * my_width) as usize]);
+                self.send_data(!image.image[(i + j * my_width) as usize]);
             }
         }
-        turn_on_display();
+        self.turn_on_display();
     }
 
-    pub fn clear(&self) {
+    pub fn clear(&mut self) {
         let my_width = WIDTH / 8;
 
-        send_command(0x10);
+        self.send_command(0x10);
         for _i in 0..(HEIGHT*my_width) {
-            send_data(0x00);
+            self.send_data(0x00);
         }
-        send_command(0x13);
+        self.send_command(0x13);
         for _i in 0..(HEIGHT*my_width)	{
-            send_data(0x00);
+            self.send_data(0x00);
         }
-        turn_on_display();
+        self.turn_on_display();
     }
 
-    pub fn clear_black(&self) {
+    pub fn clear_black(&mut self) {
         let my_width = WIDTH / 8;
 
-        send_command(0x13);
+        self.send_command(0x13);
         for _i in 0..(HEIGHT*my_width) {
-            send_data(0xff);
+            self.send_data(0xff);
         }
 
-        turn_on_display();
+        self.turn_on_display();
     }
 
     pub fn update_rate() -> u32 {
         15 * 60 * 1000 //15 mins
     }
-}
-
-fn sleep()
-{
-    send_command(0x02);  	//power off
-    wait_until_idle();
-    send_command(0x07);  	//deep sleep
-    send_data(0xA5);
-}
-
-fn reset()
-{
-    digital_write(Pin::EPD_RST_PIN, true);
-    delay_ms(200);
-    digital_write(Pin::EPD_RST_PIN, false);
-    delay_ms(2);
-    digital_write(Pin::EPD_RST_PIN, true);
-    delay_ms(200);
-}
 
 
-
-fn send_command(reg: u8)
-{
-    digital_write(Pin::EPD_DC_PIN, false);
-    digital_write(Pin::EPD_CS_PIN, false);
-    spi_write_byte(reg);
-    digital_write(Pin::EPD_CS_PIN, true);
-}
-
-
-fn send_data(data: u8)
-{
-    digital_write(Pin::EPD_DC_PIN, true);
-    digital_write(Pin::EPD_CS_PIN, false);
-    spi_write_byte(data);
-    digital_write(Pin::EPD_CS_PIN, true);
-}
-
-
-fn wait_until_idle()
-{
-    loop {
-        send_command(0x71);
-        if (digital_read(Pin::EPD_BUSY_PIN) & 0x01) == 0x01 {
-            break;
-        }
-        delay_ms(5);
+    fn sleep(&mut self)
+    {
+        self.send_command(0x02);  	//power off
+        self.wait_until_idle();
+        self.send_command(0x07);  	//deep sleep
+        self.send_data(0xA5);
     }
-    delay_ms(200);
-}
 
-fn turn_on_display()
-{
-    send_command(0x12);			//DISPLAY REFRESH
-    delay_ms(100);	        // The delay here is necessary, 200uS at least!!!
-    wait_until_idle();
+    fn reset(&mut self)
+    {
+        self.pi.write(Pin::EPD_RST_PIN, true);
+        self.pi.delay_ms(200);
+        self.pi.write(Pin::EPD_RST_PIN, false);
+        self.pi.delay_ms(2);
+        self.pi.write(Pin::EPD_RST_PIN, true);
+        self.pi.delay_ms(200);
+    }
+
+
+
+    fn send_command(&mut self, reg: u8)
+    {
+        self.pi.write(Pin::EPD_DC_PIN, false);
+        self.pi.write(Pin::EPD_CS_PIN, false);
+        self.pi.spi_write_byte(reg);
+        self.pi.write(Pin::EPD_CS_PIN, true);
+    }
+
+
+    fn send_data(&mut self, data: u8)
+    {
+        self.pi.write(Pin::EPD_DC_PIN, true);
+        self.pi.write(Pin::EPD_CS_PIN, false);
+        self.pi.spi_write_byte(data);
+        self.pi.write(Pin::EPD_CS_PIN, true);
+    }
+
+
+    fn wait_until_idle(&mut self)
+    {
+        loop {
+            self.send_command(0x71);
+            if self.pi.read(Pin::EPD_BUSY_PIN) {
+                break;
+            }
+            self.pi.delay_ms(5);
+        }
+        self.pi.delay_ms(200);
+    }
+
+    fn turn_on_display(&mut self)
+    {
+        self.send_command(0x12);			//DISPLAY REFRESH
+        self.pi.delay_ms(100);	        // The delay here is necessary, 200uS at least!!!
+        self.wait_until_idle();
+    }
 }

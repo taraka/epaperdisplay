@@ -19,39 +19,39 @@ pub enum Pin {
 }
 
 impl Pi {
-    pub fn init() -> Result<Pi, ()> {
+    pub fn init() -> Pi {
         let pi = Pi {
             spi : Spi::new(Bus::Spi0, SlaveSelect::Ss0, 10_000_000, Mode::Mode0).expect("Failed to start SPI bus"),
-            reset_pin: Gpio::new()?.get(Pin::EPD_RST_PIN as u8)?.into_output(),
-            dc_pin: Gpio::new()?.get(Pin::EPD_DC_PIN as u8)?.into_output(),
-            cs_pin: Gpio::new()?.get(Pin::EPD_CD_PIN as u8)?.into_output(),
-            busy_pin: Gpio::new()?.get(Pin::EPD_BUSY_PIN as u8)?.into_input()
+            reset_pin: Gpio::new().unwrap().get(Pin::EPD_RST_PIN as u8).unwrap().into_output(),
+            dc_pin: Gpio::new().unwrap().get(Pin::EPD_DC_PIN as u8).unwrap().into_output(),
+            cs_pin: Gpio::new().unwrap().get(Pin::EPD_DC_PIN as u8).unwrap().into_output(),
+            busy_pin: Gpio::new().unwrap().get(Pin::EPD_BUSY_PIN as u8).unwrap().into_input()
         };
 
-        return Ok(pi);
+        return pi;
     }
 
-    pub fn module_exit(&self) {
+    pub fn exit(&self) {
 
     }
 
     // Not sure why this function was on the pi module
-    pub fn delay_ms(delay: u64) {
+    pub fn delay_ms(&self, delay: u64) {
         thread::sleep(time::Duration::from_millis(delay));
     }
 
-    pub fn digital_write(&mut self, pin_id: Pin, value: bool) {
+    pub fn write(&mut self, pin_id: Pin, value: bool) {
         let mut pin = match pin_id {
-            Pin::EPD_DC_PIN => &self.dc_pin,
-            Pin::EPD_RST_PIN => &self.reset_pin,
-            Pin::EPD_CS_PIN => &self.cs_pin,
+            Pin::EPD_DC_PIN => &mut self.dc_pin,
+            Pin::EPD_RST_PIN => &mut self.reset_pin,
+            Pin::EPD_CS_PIN => &mut self.cs_pin,
             Pin::EPD_BUSY_PIN => panic!("Can't call write on the busy pin")
         };
 
         pin.write(if value { Level::High } else { Level::Low });
     }
 
-    pub fn digital_read(&mut self, pin: Pin) -> bool {
+    pub fn read(&mut self, pin_id: Pin) -> bool {
         let mut pin = match pin_id {
             Pin::EPD_BUSY_PIN => &self.busy_pin,
             _ => panic!("Cant write to that pin")
