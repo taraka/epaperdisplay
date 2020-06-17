@@ -77,6 +77,7 @@ impl Display {
         self.turn_on_display();
     }
 
+    #[allow(dead_code)]
     pub fn clear_black(&mut self) {
         let my_width = WIDTH / 8;
 
@@ -92,7 +93,7 @@ impl Display {
         15 * 60 * 1000 //15 mins
     }
 
-
+    #[allow(dead_code)]
     fn sleep(&mut self)
     {
         self.send_command(0x02);  	//power off
@@ -103,11 +104,11 @@ impl Display {
 
     fn reset(&mut self)
     {
-        self.pi.write(Pin::EPD_RST_PIN, true);
+        self.pi.write(Pin::ResetPin, true);
         self.pi.delay_ms(200);
-        self.pi.write(Pin::EPD_RST_PIN, false);
+        self.pi.write(Pin::ResetPin, false);
         self.pi.delay_ms(2);
-        self.pi.write(Pin::EPD_RST_PIN, true);
+        self.pi.write(Pin::ResetPin, true);
         self.pi.delay_ms(200);
     }
 
@@ -115,19 +116,19 @@ impl Display {
 
     fn send_command(&mut self, reg: u8)
     {
-        self.pi.write(Pin::EPD_DC_PIN, false);
-        self.pi.write(Pin::EPD_CS_PIN, false);
+        self.pi.write(Pin::DcPin, false);
+        self.pi.write(Pin::CsPin, false);
         self.pi.spi_write_byte(reg);
-        self.pi.write(Pin::EPD_CS_PIN, true);
+        self.pi.write(Pin::CsPin, true);
     }
 
 
     fn send_data(&mut self, data: u8)
     {
-        self.pi.write(Pin::EPD_DC_PIN, true);
-        self.pi.write(Pin::EPD_CS_PIN, false);
+        self.pi.write(Pin::DcPin, true);
+        self.pi.write(Pin::CsPin, false);
         self.pi.spi_write_byte(data);
-        self.pi.write(Pin::EPD_CS_PIN, true);
+        self.pi.write(Pin::CsPin, true);
     }
 
 
@@ -135,7 +136,7 @@ impl Display {
     {
         loop {
             self.send_command(0x71);
-            if self.pi.read(Pin::EPD_BUSY_PIN) {
+            if self.pi.read(Pin::BusyPin) {
                 break;
             }
             self.pi.delay_ms(5);
