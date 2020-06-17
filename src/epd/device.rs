@@ -20,12 +20,9 @@ pub enum Pin {
 }
 
 pub fn module_init() -> Result<(), u8> {
-
-    Spi::new(Bus::Spi0, SlaveSelect::Ss0, 10_000_000, Mode::Mode0)?;
-
-    match unsafe { DEV_Module_Init() } {
-        0 => Ok(()),
-        e => Err(e)
+    match unsafe { Spi::new(Bus::Spi0, SlaveSelect::Ss0, 10_000_000, Mode::Mode0) } {
+        Ok(_) => Ok(()),
+        e => Err(1)
     }
 }
 
