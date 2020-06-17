@@ -1,10 +1,7 @@
-extern crate bresenham;
+use ::bresenham;
 
-use std::ffi::CString;
-use std::os::raw::c_char;
-use crate::epd::paint::Dot_Pixel::DOT_PIXEL_1X1;
-use crate::epd::paint::Dot_Style::DOT_FILL_AROUND;
-
+use crate::epd::paint::Dot_Pixel::*;
+use crate::epd::paint::Dot_Style::*;
 use crate::epd::font::*;
 
 
@@ -99,6 +96,7 @@ pub fn new_image(width: u16, height: u16, color: Color) -> Image {
 
 impl Image {
 
+    #[allow(dead_code)]
     pub fn clear(&mut self, color: Color) {
             for y in  0..self.height_byte {
                 for x in 0..self.width_byte {//8 pixel =  1 byte
@@ -107,6 +105,7 @@ impl Image {
         }
     }
 
+    #[allow(dead_code)]
     pub fn draw_point(&mut self, x_point: u16, y_point: u16, color: Color, dot_pixel: Dot_Pixel, dot_style: Dot_Style) {
         if x_point > self.width || y_point > self.height {
             return;
@@ -133,6 +132,7 @@ impl Image {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_pixel(&mut self, x_point: u16, y_point: u16, color: Color) {
         if x_point >= self.width || y_point >= self.height {
             return;
@@ -167,6 +167,7 @@ impl Image {
 
     }
 
+    #[allow(dead_code)]
     pub fn draw_line(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, line_style: Line_Style) {
         if x_start > self.width || y_start > self.height ||
             x_end > self.width || y_end > self.height {
@@ -186,7 +187,7 @@ impl Image {
         }
     }
 
-
+    #[allow(dead_code)]
     pub fn draw_rectangle(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, draw_fill: Draw_Fill) {
         if x_start > self.width || y_start > self.height ||
             x_end > self.width || y_end > self.height {
@@ -206,6 +207,7 @@ impl Image {
         }
     }
 
+    #[allow(dead_code)]
     pub fn draw_circle(&mut self, x_center: u16, y_center: u16, radius: u16, color: Color, line_width: Dot_Pixel, draw_fill: Draw_Fill) {
         if x_center > self.width || y_center >= self.height {
             return;
@@ -261,6 +263,7 @@ impl Image {
         }
     }
 
+    #[allow(dead_code)]
     pub fn draw_string(&mut self, x_start: u16, y_start: u16, string: &str, font: &Font, fg_color: Color, bg_color: Color) -> (u16, u16){
         if x_start > self.width || y_start + font.height > self.height {
             return (x_start, y_start);
@@ -292,6 +295,7 @@ impl Image {
 
         (max_x + font.width, y + font.height)
     }
+
 
     pub fn draw_char(&mut self, x_start: u16, y_start: u16, c: char, font: &Font, fg_color: Color, bg_color: Color) {
         if x_start > self.width || y_start > self.height {
@@ -331,6 +335,7 @@ impl Image {
         }// Write all
     }
 
+    #[allow(dead_code)]
     pub fn draw_num(&mut self, x_start: u16, y_start: u16, number: i32, font: &Font, fg_color: Color, bg_color: Color) {
         self.draw_string(x_start, y_start, &format!("{}", number)[..], font, fg_color, bg_color);
     }

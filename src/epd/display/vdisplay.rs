@@ -78,12 +78,3 @@ impl Display {
         100
     }
 }
-
-pub fn reset()
-{
-
-}
-
-pub fn sleep() {
-
-}

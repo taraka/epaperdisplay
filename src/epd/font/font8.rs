@@ -1,5 +1,6 @@
 use super::Font;
 
+#[allow(dead_code)]
 pub const FONT8 : Font = Font {
     width: 5,
     height: 8,

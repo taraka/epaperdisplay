@@ -1,15 +1,16 @@
-#[macro_use]
-extern crate chan;
 mod epd;
+
 use epd::display::d7in5_v2::Display;
 use epd::paint::Image;
+
 use ical;
-use ical::parser::ParserError;
-use ical::parser::ical::component::IcalCalendar;
-use std::collections::HashMap;
-use chrono::{DateTime, Utc, Local, TimeZone, NaiveDateTime, FixedOffset, Duration, Datelike};
+use chrono::{DateTime, Utc, Duration, Datelike};
+use chan::chan_select;
+
 use std::borrow::Borrow;
-use std::ops::{Sub, Add};
+use std::ops::Sub;
+use std::collections::HashMap;
+
 
 #[derive(PartialEq)]
 enum Repeat {
@@ -31,9 +32,6 @@ fn main() {
       println!("e-Paper Init and Clear...");
       let mut display = Display::init();
       display.clear();
-      //epd::device::delay_ms(100);
-
-
 
       let mut cal = fetch_data();
       draw_cal(&mut display, &cal);
@@ -70,8 +68,8 @@ fn fetch_data() -> Vec<Event> {
             if  props.contains_key("SUMMARY") && props.contains_key("DTEND") && props.contains_key("DTSTART") {
                   let repeat = get_repeat(props.get("RRULE"));
 
-                  let (start, all_day) = unpack_time_stamp(props.get("DTSTART"), &repeat);
-                  let (end, _) = unpack_time_stamp(props.get("DTEND"), &repeat);
+                  let (start, all_day) = unpack_time_stamp(props.get("DTSTART"));
+                  let (end, _) = unpack_time_stamp(props.get("DTEND"));
 
 
 
@@ -139,7 +137,7 @@ fn get_repeat(rrule: Option<&String>) -> Repeat {
       }
 }
 
-fn unpack_time_stamp(input: Option<&String>, repeat: &Repeat) -> (DateTime<Utc>, bool) {
+fn unpack_time_stamp(input: Option<&String>) -> (DateTime<Utc>, bool) {
       const FORMAT: &str = "%Y%m%dT%H%M%SZ%z";
       let input_string = input.unwrap();
 
