@@ -13,10 +13,14 @@ chan = "0.1.23"
 ical = "0.6.0"
 reqwest = { version = "0.10", features = ["blocking"] }
 chrono = "0.4.11"
-rppal = "0.11.3"
+
 
 [build-dependencies]
 cc = "1.0"
 
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
 sdl2 = "0.34.1"
+
+
+[target.'cfg(not(any(target_arch = "x86", target_arch = "x86_64")))'.dependencies]
+rppal = "0.11.3"
