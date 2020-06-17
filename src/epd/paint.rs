@@ -5,6 +5,8 @@ use std::os::raw::c_char;
 use crate::epd::paint::Dot_Pixel::DOT_PIXEL_1X1;
 use crate::epd::paint::Dot_Style::DOT_FILL_AROUND;
 
+use crate::epd::font::*;
+
 
 pub struct Image {
     pub(crate) image: ImageData,
@@ -18,23 +20,6 @@ pub struct Image {
     width_byte: u16,
     height_byte: u16,
     scale: u16
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct Font
-{
-    table: *const u8,
-    pub width: u16,
-    pub height: u16
-}
-
-extern "C" {
-    pub static Font24: Font;
-    pub static Font20: Font;
-    pub static Font16: Font;
-    pub static Font12: Font;
-    pub static Font8: Font;
 }
 
 pub type ImageData = Box<[u8]>;
@@ -110,22 +95,6 @@ pub fn new_image(width: u16, height: u16, color: Color) -> Image {
         width,
         height
     }
-}
-
-pub fn font8() -> Box<Font> {
-    return unsafe { Box::new(Font8) };
-}
-pub fn font12() -> Box<Font> {
-    return unsafe { Box::new(Font12) };
-}
-pub fn font16() -> Box<Font> {
-    return unsafe { Box::new(Font16) };
-}
-pub fn font20() -> Box<Font> {
-    return unsafe { Box::new(Font20) };
-}
-pub fn font24() -> Box<Font> {
-    return unsafe { Box::new(Font24) };
 }
 
 impl Image {
@@ -292,7 +261,7 @@ impl Image {
         }
     }
 
-    pub fn draw_string(&mut self, x_start: u16, y_start: u16, string: &str, font: Box<Font>, fg_color: Color, bg_color: Color) -> (u16, u16){
+    pub fn draw_string(&mut self, x_start: u16, y_start: u16, string: &str, font: &Font, fg_color: Color, bg_color: Color) -> (u16, u16){
         if x_start > self.width || y_start + font.height > self.height {
             return (x_start, y_start);
         }
@@ -324,7 +293,7 @@ impl Image {
         (max_x + font.width, y + font.height)
     }
 
-    pub fn draw_char(&mut self, x_start: u16, y_start: u16, c: char, font: &Box<Font>, fg_color: Color, bg_color: Color) {
+    pub fn draw_char(&mut self, x_start: u16, y_start: u16, c: char, font: &Font, fg_color: Color, bg_color: Color) {
         if x_start > self.width || y_start > self.height {
             return;
         }
@@ -334,16 +303,16 @@ impl Image {
         for page in 0..font.height {
             for column in 0..font.width {
 
-                let data = unsafe { *font.table.offset(offset as isize) };
+                let data = font.table.get(offset as usize).unwrap() ;
 
                 //To determine whether the font background color and screen background color is consistent
                 if bg_color == self.color { //this process is to speed up the scan
-                    if data as u16 & (0x80 >> (column % 8)) != 0 {
+                    if data & (0x80 >> (column % 8)) != 0 {
                         self.set_pixel(x_start + column, y_start + page, fg_color);
                     }
                     // Paint_DrawPoint(Xpoint + Column, Ypoint + Page, Color_Foreground, DOT_PIXEL_DFT, DOT_STYLE_DFT);
                 } else {
-                    if data as u16 & (0x80 >> (column % 8)) != 0 {
+                    if data & (0x80 >> (column % 8)) != 0 {
                         self.set_pixel(x_start + column, y_start + page, fg_color);
                         // Paint_DrawPoint(Xpoint + Column, Ypoint + Page, Color_Foreground, DOT_PIXEL_DFT, DOT_STYLE_DFT);
                     } else {
@@ -362,7 +331,7 @@ impl Image {
         }// Write all
     }
 
-    pub fn draw_num(&mut self, x_start: u16, y_start: u16, number: i32, font: Box<Font>, fg_color: Color, bg_color: Color) {
+    pub fn draw_num(&mut self, x_start: u16, y_start: u16, number: i32, font: &Font, fg_color: Color, bg_color: Color) {
         self.draw_string(x_start, y_start, &format!("{}", number)[..], font, fg_color, bg_color);
     }
 
