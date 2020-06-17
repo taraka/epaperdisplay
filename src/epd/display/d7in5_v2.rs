@@ -100,11 +100,11 @@ fn sleep()
 
 fn reset()
 {
-    digital_write(Pin::EPD_RST_PIN, 1);
+    digital_write(Pin::EPD_RST_PIN, true);
     delay_ms(200);
-    digital_write(Pin::EPD_RST_PIN, 0);
+    digital_write(Pin::EPD_RST_PIN, false);
     delay_ms(2);
-    digital_write(Pin::EPD_RST_PIN, 1);
+    digital_write(Pin::EPD_RST_PIN, true);
     delay_ms(200);
 }
 
@@ -112,19 +112,19 @@ fn reset()
 
 fn send_command(reg: u8)
 {
-    digital_write(Pin::EPD_DC_PIN, 0);
-    digital_write(Pin::EPD_CS_PIN, 0);
+    digital_write(Pin::EPD_DC_PIN, false);
+    digital_write(Pin::EPD_CS_PIN, false);
     spi_write_byte(reg);
-    digital_write(Pin::EPD_CS_PIN, 1);
+    digital_write(Pin::EPD_CS_PIN, true);
 }
 
 
 fn send_data(data: u8)
 {
-    digital_write(Pin::EPD_DC_PIN, 1);
-    digital_write(Pin::EPD_CS_PIN, 0);
+    digital_write(Pin::EPD_DC_PIN, true);
+    digital_write(Pin::EPD_CS_PIN, false);
     spi_write_byte(data);
-    digital_write(Pin::EPD_CS_PIN, 1);
+    digital_write(Pin::EPD_CS_PIN, true);
 }
 
 
