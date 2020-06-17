@@ -1,7 +1,7 @@
 use ::bresenham;
 
-use crate::epd::paint::Dot_Pixel::*;
-use crate::epd::paint::Dot_Style::*;
+use crate::epd::paint::DotPixel::*;
+use crate::epd::paint::DotStyle::*;
 use crate::epd::font::*;
 
 
@@ -15,38 +15,40 @@ pub struct Image {
     rotate: Rotation,
     mirror: Mirror,
     width_byte: u16,
-    height_byte: u16,
-    scale: u16
+    height_byte: u16
 }
 
 pub type ImageData = Box<[u8]>;
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Color {
     White = 0xff,
     Black = 0x00
 }
-
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq)]
 enum Mirror {
-    NONE  = 0,
-    HORIZONTAL = 1,
-    VERTICAL = 2,
-    ORIGIN = 3,
+    None = 0,
+    Horizontal = 1,
+    Vertical = 2,
+    Origin = 3,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq)]
-pub enum Dot_Pixel {
-    DOT_PIXEL_1X1  = 1,
-    DOT_PIXEL_2X2,
-    DOT_PIXEL_3X3,
-    DOT_PIXEL_4X4,
-    DOT_PIXEL_5X5,
-    DOT_PIXEL_6X6,
-    DOT_PIXEL_7X7,
-    DOT_PIXEL_8X8,
+pub enum DotPixel {
+    DotPixel1x1 = 1,
+    DotPixel2x2,
+    DotPixel3x3,
+    DotPixel4x4,
+    DotPixel5x5,
+    DotPixel6x6,
+    DotPixel7x7,
+    DotPixel8x8,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Rotation {
     R0  = 0,
@@ -55,22 +57,25 @@ pub enum Rotation {
     R270 = 270
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq)]
-pub enum Dot_Style {
-    DOT_FILL_AROUND  = 1,		// dot pixel 1 x 1
-    DOT_FILL_RIGHTUP  , 		// dot pixel 2 X 2
+pub enum DotStyle {
+    DotFillAround = 1,		// dot pixel 1 x 1
+    DotFillRightup, 		// dot pixel 2 X 2
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq)]
-pub enum Line_Style {
-    LINE_STYLE_SOLID = 0,
-    LINE_STYLE_DOTTED,
+pub enum LineStyle {
+    LineStyleSolid = 0,
+    LineStyleDotted,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq)]
-pub enum Draw_Fill {
-    DRAW_FILL_EMPTY = 0,
-    DRAW_FILL_FULL,
+pub enum DrawFill {
+    DrawFillEmpty = 0,
+    DrawFillFull,
 }
 
 
@@ -84,11 +89,10 @@ pub fn new_image(width: u16, height: u16, color: Color) -> Image {
         width_memory: width,
         height_memory: height,
         color,
-        scale: 2,
         width_byte: width / 8,
         height_byte: height,
         rotate: Rotation::R0,
-        mirror: Mirror::NONE,
+        mirror: Mirror::None,
         width,
         height
     }
@@ -106,20 +110,20 @@ impl Image {
     }
 
     #[allow(dead_code)]
-    pub fn draw_point(&mut self, x_point: u16, y_point: u16, color: Color, dot_pixel: Dot_Pixel, dot_style: Dot_Style) {
+    pub fn draw_point(&mut self, x_point: u16, y_point: u16, color: Color, dot_pixel: DotPixel, dot_style: DotStyle) {
         if x_point > self.width || y_point > self.height {
             return;
         }
 
         let dot_size = dot_pixel as u16;
 
-        if dot_style == Dot_Style::DOT_FILL_AROUND {
+        if dot_style == DotStyle::DotFillAround {
             for xdir_num in 0..2 * dot_pixel as u16 - 1 {
                 for ydir_num in 0..2 * dot_pixel as u16 - 1 {
                     if (x_point as i32 + xdir_num as i32 - dot_size as i32) < 0 || (y_point as i32 + ydir_num as i32 - dot_size as i32) < 0 {
                         break;
                     }
-                    // printf("x = %d, y = %d\r\n", Xpoint + XDir_Num - Dot_Pixel, Ypoint + YDir_Num - Dot_Pixel);
+                    // printf("x = %d, y = %d\r\n", Xpoint + XDir_Num - DotPixel, Ypoint + YDir_Num - DotPixel);
                     self.set_pixel(x_point + xdir_num - dot_size, y_point + ydir_num - dot_size, color);
                 }
             }
@@ -147,10 +151,10 @@ impl Image {
         };
 
         let (x, y) = match self.mirror {
-            Mirror::NONE => { (x, y) }
-            Mirror::HORIZONTAL => { (self.width_memory - x - 1, y) }
-            Mirror::VERTICAL => { (x, self.height_memory - y - 1) }
-            Mirror::ORIGIN => { (self.width_memory - x - 1, self.height_memory - y - 1) }
+            Mirror::None => { (x, y) }
+            Mirror::Horizontal => { (self.width_memory - x - 1, y) }
+            Mirror::Vertical => { (x, self.height_memory - y - 1) }
+            Mirror::Origin => { (self.width_memory - x - 1, self.height_memory - y - 1) }
         };
 
         if x > self.width_memory || y > self.height_memory {
@@ -168,7 +172,7 @@ impl Image {
     }
 
     #[allow(dead_code)]
-    pub fn draw_line(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, line_style: Line_Style) {
+    pub fn draw_line(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: DotPixel, line_style: LineStyle) {
         if x_start > self.width || y_start > self.height ||
             x_end > self.width || y_end > self.height {
             return;
@@ -178,37 +182,37 @@ impl Image {
 
         for (x, y) in bresenham::Bresenham::new((x_start as isize, y_start as isize), (x_end as isize, y_end as isize)) {
             dotted_len += 1;
-            if line_style == Line_Style::LINE_STYLE_DOTTED && dotted_len % 3 == 0 {
-                self.draw_point(x as u16, y as u16, self.color, line_width, Dot_Style::DOT_FILL_AROUND);
+            if line_style == LineStyle::LineStyleDotted && dotted_len % 3 == 0 {
+                self.draw_point(x as u16, y as u16, self.color, line_width, DotStyle::DotFillAround);
                 dotted_len = 0;
             } else {
-                self.draw_point(x as u16, y as u16, color, line_width, Dot_Style::DOT_FILL_AROUND);
+                self.draw_point(x as u16, y as u16, color, line_width, DotStyle::DotFillAround);
             }
         }
     }
 
     #[allow(dead_code)]
-    pub fn draw_rectangle(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: Dot_Pixel, draw_fill: Draw_Fill) {
+    pub fn draw_rectangle(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: Color, line_width: DotPixel, draw_fill: DrawFill) {
         if x_start > self.width || y_start > self.height ||
             x_end > self.width || y_end > self.height {
             return;
         }
 
-        if draw_fill == Draw_Fill::DRAW_FILL_FULL {
+        if draw_fill == DrawFill::DrawFillFull {
 
             for y_point in y_start..y_end {
-                self.draw_line(x_start, y_point, x_end, y_point, color , line_width, Line_Style::LINE_STYLE_SOLID);
+                self.draw_line(x_start, y_point, x_end, y_point, color, line_width, LineStyle::LineStyleSolid);
             }
         } else {
-            self.draw_line(x_start, y_start, x_end, y_start, color, line_width, Line_Style::LINE_STYLE_SOLID);
-            self.draw_line(x_start, y_start, x_start, y_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
-            self.draw_line(x_end, y_end, x_end, y_start, color, line_width, Line_Style::LINE_STYLE_SOLID);
-            self.draw_line(x_start, y_end, x_end , y_end, color, line_width, Line_Style::LINE_STYLE_SOLID);
+            self.draw_line(x_start, y_start, x_end, y_start, color, line_width, LineStyle::LineStyleSolid);
+            self.draw_line(x_start, y_start, x_start, y_end, color, line_width, LineStyle::LineStyleSolid);
+            self.draw_line(x_end, y_end, x_end, y_start, color, line_width, LineStyle::LineStyleSolid);
+            self.draw_line(x_start, y_end, x_end, y_end, color, line_width, LineStyle::LineStyleSolid);
         }
     }
 
     #[allow(dead_code)]
-    pub fn draw_circle(&mut self, x_center: u16, y_center: u16, radius: u16, color: Color, line_width: Dot_Pixel, draw_fill: Draw_Fill) {
+    pub fn draw_circle(&mut self, x_center: u16, y_center: u16, radius: u16, color: Color, line_width: DotPixel, draw_fill: DrawFill) {
         if x_center > self.width || y_center >= self.height {
             return;
         }
@@ -219,17 +223,17 @@ impl Image {
         //Cumulative error,judge the next point of the logo
         let mut esp = 3 - (radius << 1 ) as i32;
 
-        if draw_fill == Draw_Fill::DRAW_FILL_FULL {
+        if draw_fill == DrawFill::DrawFillFull {
             while x <= y { //Realistic circles
                 for cy in x..y+1 {
-                    self.draw_point(x_center + x, y_center + cy, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//1
-                    self.draw_point(x_center - x, y_center + cy, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//2
-                    self.draw_point(x_center - cy, y_center + x, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//3
-                    self.draw_point(x_center - cy, y_center - x, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//4
-                    self.draw_point(x_center - x, y_center - cy, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//5
-                    self.draw_point(x_center + x, y_center - cy, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//6
-                    self.draw_point(x_center + cy, y_center - x, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);//7
-                    self.draw_point(x_center + cy, y_center + x, color, DOT_PIXEL_1X1, DOT_FILL_AROUND);
+                    self.draw_point(x_center + x, y_center + cy, color, DotPixel1x1, DotFillAround);//1
+                    self.draw_point(x_center - x, y_center + cy, color, DotPixel1x1, DotFillAround);//2
+                    self.draw_point(x_center - cy, y_center + x, color, DotPixel1x1, DotFillAround);//3
+                    self.draw_point(x_center - cy, y_center - x, color, DotPixel1x1, DotFillAround);//4
+                    self.draw_point(x_center - x, y_center - cy, color, DotPixel1x1, DotFillAround);//5
+                    self.draw_point(x_center + x, y_center - cy, color, DotPixel1x1, DotFillAround);//6
+                    self.draw_point(x_center + cy, y_center - x, color, DotPixel1x1, DotFillAround);//7
+                    self.draw_point(x_center + cy, y_center + x, color, DotPixel1x1, DotFillAround);
                 }
                 if esp < 0 {
                     esp += 4 * x as i32 + 6;
@@ -242,14 +246,14 @@ impl Image {
             }
         } else { //Draw a hollow circle
             while x <= y {
-                self.draw_point(x_center + x, y_center + y, color, line_width, DOT_FILL_AROUND);//1
-                self.draw_point(x_center - x, y_center + y, color, line_width, DOT_FILL_AROUND);//2
-                self.draw_point(x_center - y, y_center + x, color, line_width, DOT_FILL_AROUND);//3
-                self.draw_point(x_center - y, y_center - x, color, line_width, DOT_FILL_AROUND);//4
-                self.draw_point(x_center - x, y_center - y, color, line_width, DOT_FILL_AROUND);//5
-                self.draw_point(x_center + x, y_center - y, color, line_width, DOT_FILL_AROUND);//6
-                self.draw_point(x_center + y, y_center - x, color, line_width, DOT_FILL_AROUND);//7
-                self.draw_point(x_center + y, y_center + x, color, line_width, DOT_FILL_AROUND);//0
+                self.draw_point(x_center + x, y_center + y, color, line_width, DotFillAround);//1
+                self.draw_point(x_center - x, y_center + y, color, line_width, DotFillAround);//2
+                self.draw_point(x_center - y, y_center + x, color, line_width, DotFillAround);//3
+                self.draw_point(x_center - y, y_center - x, color, line_width, DotFillAround);//4
+                self.draw_point(x_center - x, y_center - y, color, line_width, DotFillAround);//5
+                self.draw_point(x_center + x, y_center - y, color, line_width, DotFillAround);//6
+                self.draw_point(x_center + y, y_center - x, color, line_width, DotFillAround);//7
+                self.draw_point(x_center + y, y_center + x, color, line_width, DotFillAround);//0
 
                 if esp < 0 {
                     esp += 4 * x as i32 + 6;

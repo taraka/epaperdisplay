@@ -1,13 +1,11 @@
 mod epd;
 
 use epd::display::d7in5_v2::Display;
-use epd::paint::Image;
 
 use ical;
 use chrono::{DateTime, Utc, Duration, Datelike};
 use chan::chan_select;
 
-use std::borrow::Borrow;
 use std::ops::Sub;
 use std::collections::HashMap;
 
@@ -157,7 +155,7 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
 
       image.clear(epd::paint::Color::White);
 
-      image.draw_line(105, 10, 105, 470, epd::paint::Color::Black, epd::paint::Dot_Pixel::DOT_PIXEL_1X1, epd::paint::Line_Style::LINE_STYLE_DOTTED);
+      image.draw_line(105, 10, 105, 470, epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleDotted);
 
 
       let mut y: u16 = 10;
@@ -193,7 +191,7 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
 
             y = if y > date_y { y } else { date_y };
 
-            image.draw_line(10, y+8, 790, y+8, epd::paint::Color::Black, epd::paint::Dot_Pixel::DOT_PIXEL_1X1, epd::paint::Line_Style::LINE_STYLE_DOTTED);
+            image.draw_line(10, y+8, 790, y+8, epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleDotted);
             y+=16
       }
 
