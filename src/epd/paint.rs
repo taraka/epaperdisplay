@@ -4,7 +4,7 @@ use crate::epd::paint::DotPixel::*;
 use crate::epd::paint::DotStyle::*;
 use crate::epd::font::*;
 
-
+#[derive(PartialEq)]
 pub struct Image {
     pub(crate) image: ImageData,
     width: u16,

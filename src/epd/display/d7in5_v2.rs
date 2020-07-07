@@ -5,15 +5,16 @@ pub const WIDTH: u16 = 800;
 pub const HEIGHT: u16 = 480;
 
 pub struct Display {
-    pi: Pi
+    pi: Pi,
+    last_image: Option<Image>
 }
 
 impl Display {
     pub fn init() -> Display {
 
         let mut this = Display {
-            pi: Pi::init()
-
+            pi: Pi::init(),
+            last_image: None
         };
 
         this.reset();
@@ -50,8 +51,15 @@ impl Display {
         return this;
     }
 
+    pub fn same_image(&self, image: &Image) -> bool {
+         self.last_image.is_some() && image == self.last_image.as_ref().unwrap()
+    }
 
     pub fn display(&mut self, image: Image) {
+        if self.same_image(&image) {
+            return;
+        }
+
         let my_width = WIDTH / 8;
 
         self.send_command(0x13);
@@ -60,6 +68,9 @@ impl Display {
                 self.send_data(!image.image[(i + j * my_width) as usize]);
             }
         }
+
+        self.last_image = Some(image);
+
         self.turn_on_display();
     }
 
