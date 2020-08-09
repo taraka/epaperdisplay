@@ -301,7 +301,14 @@ impl Image {
     }
 
 
-    pub fn draw_char(&mut self, x_start: u16, y_start: u16, c: char, font: &Font, fg_color: Color, bg_color: Color) {
+    pub fn draw_char(&mut self, x_start: u16, y_start: u16, ci: char, font: &Font, fg_color: Color, bg_color: Color) {
+        let c = if ci as u8 == 25 {
+            '\''
+        }
+        else {
+            ci
+        };
+
         if x_start > self.width || y_start > self.height {
             return;
         }
@@ -345,3 +352,4 @@ impl Image {
     }
 
 }
+
