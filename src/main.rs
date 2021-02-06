@@ -53,7 +53,7 @@ fn fetch_data() -> Vec<Event> {
       let resp = reqwest::blocking::get(&std::env::var("ICALADDR").expect("you need to set ICALADDR")).expect("Request failed").text().unwrap();
       let cal = ical::IcalParser::new(resp.as_bytes()).next().expect("Parsing failed").expect("Really failed");
       let mut output = Vec::new();
-
+      
       for e in cal.events {
             let mut props = HashMap::new();
 
@@ -125,9 +125,10 @@ fn find_next_yearly_instance(dt: &DateTime<Utc>) -> DateTime<Utc> {
 fn get_repeat(rrule: Option<&String>) -> Repeat {
       match rrule {
             Some(rule) => {
-                  if rule == "FREQ=YEARLY" {
+                  if &rule[0..11] == "FREQ=YEARLY" {
                         Repeat::YEARLY
                   } else {
+                        //eprintln!("Invalid repeat: {:?}", &rrule);
                         Repeat::NONE
                   }
             },
