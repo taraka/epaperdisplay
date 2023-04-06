@@ -318,7 +318,10 @@ impl Image {
         for page in 0..font.height {
             for column in 0..font.width {
 
-                let data = font.table.get(offset as usize).unwrap() ;
+                let data = match font.table.get(offset as usize) {
+                    Some(d) => *d,
+                    _ => 31,
+                };
 
                 //To determine whether the font background color and screen background color is consistent
                 if bg_color == self.color { //this process is to speed up the scan
