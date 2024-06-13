@@ -87,7 +87,9 @@ fn fetch_data() -> Vec<Event> {
       }
 
       let now = Utc::now();
-      let today = now.sub(Duration::seconds(now.timestamp() % 86400));
+      let today: DateTime<Utc> = now.sub(Duration::seconds(now.timestamp() % 86400)).sub(Duration::seconds(1));
+
+      println!("{:?}", today);
 
       let mut output = output.into_iter().filter(|e| {
             e.start >= today || e.repeat != Repeat::NONE
@@ -139,7 +141,7 @@ fn get_repeat(rrule: Option<&String>) -> Repeat {
 fn unpack_time_stamp(input: Option<&String>) -> (DateTime<Utc>, bool) {
       const FORMAT: &str = "%Y%m%dT%H%M%SZ%z";
       let input_string = input.unwrap();
-
+      println!("{}", input_string);
       let values = match DateTime::parse_from_str(&format!("{}{}", input_string, "+0000")[..], FORMAT) {
             Ok(d) => (d.with_timezone(&Utc), false),
             Err(_) => match DateTime::parse_from_str(&format!("{}{}", input_string, "Z+0000")[..], FORMAT) {
@@ -173,7 +175,7 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
             let time = format!("{} - {}", e.start.format("%H:%M"), end.format("%H:%M"));
 
             let (_, mut date_y) = image.draw_string(10, y, &format!("{}", start_date)[..], &epd::font::FONT16, epd::paint::Color::Black, epd::paint::Color::White);
-            if end.date() != e.start.date() {
+            if end.date_naive() != e.start.date_naive() {
                   let (_, end_date_y) = image.draw_string(10, date_y, &format!("{}", end_date)[..], &epd::font::FONT16, epd::paint::Color::Black, epd::paint::Color::White);
                   date_y = end_date_y;
             }

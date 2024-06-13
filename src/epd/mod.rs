@@ -1,4 +1,4 @@
-#[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 mod device;
 
 pub mod display;
