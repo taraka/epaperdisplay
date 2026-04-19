@@ -89,7 +89,7 @@ fn fetch_data() -> Vec<Event> {
       let now = Utc::now();
       let today: DateTime<Utc> = now.sub(Duration::seconds(now.timestamp() % 86400)).sub(Duration::seconds(1));
 
-      println!("{:?}", today);
+      //println!("{:?}", today);
 
       let mut output = output.into_iter().filter(|e| {
             e.start >= today || e.repeat != Repeat::NONE
@@ -141,7 +141,7 @@ fn get_repeat(rrule: Option<&String>) -> Repeat {
 fn unpack_time_stamp(input: Option<&String>) -> (DateTime<Utc>, bool) {
       const FORMAT: &str = "%Y%m%dT%H%M%SZ%z";
       let input_string = input.unwrap();
-      println!("{}", input_string);
+      //println!("{}", input_string);
       let values = match DateTime::parse_from_str(&format!("{}{}", input_string, "+0000")[..], FORMAT) {
             Ok(d) => (d.with_timezone(&Utc), false),
             Err(_) => match DateTime::parse_from_str(&format!("{}{}", input_string, "Z+0000")[..], FORMAT) {
