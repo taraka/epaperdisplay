@@ -198,5 +198,7 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
             y+=16
       }
 
-      display.display(image);
+      if display.display(image) {
+            println!("Display updated");
+      }
 }

@@ -38,7 +38,7 @@ impl Display {
     #[allow(dead_code)]
     pub fn clear_black(&mut self) {}
 
-    pub fn display(&mut self, image: Image) {
+    pub fn display(&mut self, image: Image) -> bool {
 
         let canvas = &mut self.canvas;
 
@@ -70,6 +70,8 @@ impl Display {
                 _ => {}
             }
         }
+
+        return true;
     }
 
     pub fn update_rate() -> u32 {

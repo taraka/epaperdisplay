@@ -55,9 +55,9 @@ impl Display {
          self.last_image.is_some() && image == self.last_image.as_ref().unwrap()
     }
 
-    pub fn display(&mut self, image: Image) {
+    pub fn display(&mut self, image: Image) -> bool {
         if self.same_image(&image) {
-            return;
+            return false;
         }
 
         let my_width = WIDTH / 8;
@@ -72,6 +72,7 @@ impl Display {
         self.last_image = Some(image);
 
         self.turn_on_display();
+        return true;
     }
 
     pub fn clear(&mut self) {
