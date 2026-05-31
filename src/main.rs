@@ -157,51 +157,86 @@ fn unpack_time_stamp(input: Option<&String>) -> (DateTime<Utc>, bool) {
 }
 
 fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
-      let mut image = epd::paint::new_image(epd::display::d7in5_v2::WIDTH, epd::display::d7in5_v2::HEIGHT, epd::paint::Color::White);
+      const HEADER_H: u16 = 36;
+      const DIVIDER_X: u16 = 130;
 
+      let mut image = epd::paint::new_image(epd::display::d7in5_v2::WIDTH, epd::display::d7in5_v2::HEIGHT, epd::paint::Color::White);
       image.clear(epd::paint::Color::White);
 
-      image.draw_line(105, 10, 105, 470, epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleDotted);
+      let now = Utc::now();
+      let today = now.date_naive();
 
+      // Header bar
+      image.draw_rectangle(0, 0, epd::display::d7in5_v2::WIDTH, HEADER_H,
+            epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::DrawFill::DrawFillFull);
+      image.draw_string(10, 8, &now.format("%A %d %B %Y").to_string(),
+            &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black);
 
-      let mut y: u16 = 10;
+      // Vertical divider
+      image.draw_line(DIVIDER_X, HEADER_H, DIVIDER_X, epd::display::d7in5_v2::HEIGHT,
+            epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid);
+
+      let mut y: u16 = HEADER_H + 8;
       for e in cal {
             let end = match e.all_day {
                   true => e.end.sub(Duration::seconds(1)),
                   false => e.end
             };
 
-            let start_date = format!("{}", e.start.format("%d/%m/%y"));
-            let end_date = format!("{}", e.end.format("%d/%m/%y"));
+            let is_today = e.start.date_naive() == today ||
+                  (e.start.date_naive() <= today && end.date_naive() >= today);
 
+            let (fg, bg) = if is_today {
+                  (epd::paint::Color::White, epd::paint::Color::Black)
+            } else {
+                  (epd::paint::Color::Black, epd::paint::Color::White)
+            };
 
-            let time = format!("{} - {}", e.start.format("%H:%M"), end.format("%H:%M"));
+            // Pre-calculate row height so we can draw the inverted background first
+            let mut date_h: u16 = 16;
+            if end.date_naive() != e.start.date_naive() { date_h += 16; }
+            if !e.all_day { date_h += 14; }
+            let mut name_h: u16 = 24;
+            if e.location.is_some() { name_h += 14; }
+            let row_h = date_h.max(name_h);
 
-            let (_, mut date_y) = image.draw_string(10, y, &format!("{}", start_date)[..], &epd::font::FONT16, epd::paint::Color::Black, epd::paint::Color::White);
+            if is_today {
+                  image.draw_rectangle(0, y.saturating_sub(4), epd::display::d7in5_v2::WIDTH, y + row_h + 4,
+                        epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::DrawFill::DrawFillFull);
+                  image.draw_line(DIVIDER_X, y.saturating_sub(4), DIVIDER_X, y + row_h + 4,
+                        epd::paint::Color::White, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid);
+            }
+
+            // Left column: date and time
+            let (_, mut date_y) = image.draw_string(10, y, &e.start.format("%a %d %b").to_string(),
+                  &epd::font::FONT16, fg, bg);
             if end.date_naive() != e.start.date_naive() {
-                  let (_, end_date_y) = image.draw_string(10, date_y, &format!("{}", end_date)[..], &epd::font::FONT16, epd::paint::Color::Black, epd::paint::Color::White);
-                  date_y = end_date_y;
+                  let (_, edy) = image.draw_string(10, date_y, &e.end.format("%a %d %b").to_string(),
+                        &epd::font::FONT16, fg, bg);
+                  date_y = edy;
             }
-
             if !e.all_day {
-                  let (_, time_y) = image.draw_string(10, date_y + 2, &format!("{}", time)[..], &epd::font::FONT12, epd::paint::Color::Black, epd::paint::Color::White);
-                  date_y = time_y
-            }
-            let (_, next_y) = image.draw_string(115, y, &format!("{}", e.name)[..], &epd::font::FONT20, epd::paint::Color::Black, epd::paint::Color::White);
-            y = next_y;
-
-            if e.location != None {
-                  let (_, next_y) = image.draw_string(115, y+2, &e.location.as_ref().unwrap().replace("\\n", ", ").replace("\\", " ")[..], &epd::font::FONT12, epd::paint::Color::Black, epd::paint::Color::White);
-                  y = next_y;
+                  let time_str = format!("{} - {}", e.start.format("%H:%M"), end.format("%H:%M"));
+                  let (_, ty) = image.draw_string(10, date_y + 2, &time_str, &epd::font::FONT12, fg, bg);
+                  date_y = ty;
             }
 
-            y = if y > date_y { y } else { date_y };
+            // Right column: name and location
+            let (_, mut name_y) = image.draw_string(DIVIDER_X + 10, y, &e.name, &epd::font::FONT24, fg, bg);
+            if let Some(loc) = &e.location {
+                  let (_, ly) = image.draw_string(DIVIDER_X + 10, name_y + 2,
+                        &loc.replace("\\n", ", ").replace("\\", " "), &epd::font::FONT12, fg, bg);
+                  name_y = ly;
+            }
 
-            image.draw_line(10, y+8, 790, y+8, epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleDotted);
-            y+=16
+            y = date_y.max(name_y);
+
+            image.draw_line(10, y + 8, 790, y + 8,
+                  epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid);
+            y += 16;
       }
 
       if display.display(image) {
-            println!("Display updated");
+            //println!("Display updated");
       }
 }
