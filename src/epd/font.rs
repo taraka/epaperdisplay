@@ -4,7 +4,6 @@ mod font16;
 mod font20;
 mod font24;
 
-pub use font8::FONT8;
 pub use font12::FONT12;
 pub use font16::FONT16;
 pub use font20::FONT20;

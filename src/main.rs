@@ -24,7 +24,8 @@ struct Event {
       start: DateTime<Utc>,
       end: DateTime<Utc>,
       all_day: bool,
-      repeat: Repeat
+      repeat: Repeat,
+      is_recurring: bool,
 }
 
 struct WeatherData {
@@ -182,6 +183,7 @@ fn fetch_data() -> Vec<Event> {
                         start,
                         end,
                         all_day,
+                        is_recurring: false,
                         repeat
                   });
             }
@@ -207,6 +209,7 @@ fn fetch_data() -> Vec<Event> {
                         name: e.name,
                         location: e.location,
                         all_day: e.all_day,
+                        is_recurring: false,
                         repeat: e.repeat,
                   }],
                   Repeat::WEEKLY => {
@@ -223,6 +226,7 @@ fn fetch_data() -> Vec<Event> {
                                     start: dt,
                                     end: dt + duration,
                                     all_day: e.all_day,
+                                    is_recurring: true,
                                     repeat: Repeat::NONE,
                               });
                               dt = dt + Duration::weeks(1);
@@ -459,6 +463,7 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>, weather: Option<&WeatherDat
 
       let mut y: u16 = HEADER_H + 8;
       for e in cal {
+            if y + 24 >= epd::display::d7in5_v2::HEIGHT { break; }
             let end = match e.all_day {
                   true => e.end.sub(Duration::seconds(1)),
                   false => e.end
@@ -473,12 +478,21 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>, weather: Option<&WeatherDat
                   (epd::paint::Color::Black, epd::paint::Color::White)
             };
 
+            let name_font = if e.is_recurring { &epd::font::FONT16 } else { &epd::font::FONT24 };
+            let name_font_h: u16 = if e.is_recurring { 16 } else { 24 };
+
             // Pre-calculate row height so we can draw the inverted background first
-            let mut date_h: u16 = 16;
-            if end.date_naive() != e.start.date_naive() { date_h += 16; }
-            if !e.all_day { date_h += 14; }
-            let mut name_h: u16 = 24;
-            if e.location.is_some() { name_h += 14; }
+            let date_h: u16 = if e.is_recurring {
+                  12 // date + time combined on one FONT12 line
+            } else {
+                  let mut h = 16u16;
+                  if end.date_naive() != e.start.date_naive() { h += 16; }
+                  if !e.all_day { h += 14; }
+                  h
+            };
+            let _ = date_h; // suppress unused warning if needed
+            let mut name_h: u16 = name_font_h;
+            if !e.is_recurring { if e.location.is_some() { name_h += 14; } }
             let row_h = date_h.max(name_h);
 
             if is_today {
@@ -489,25 +503,37 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>, weather: Option<&WeatherDat
             }
 
             // Left column: date and time
-            let (_, mut date_y) = image.draw_string(10, y, &e.start.format("%a %d %b").to_string(),
-                  &epd::font::FONT16, fg, bg);
-            if end.date_naive() != e.start.date_naive() {
-                  let (_, edy) = image.draw_string(10, date_y, &e.end.format("%a %d %b").to_string(),
+            let (_, date_y) = if e.is_recurring {
+                  let date_time_str = if e.all_day {
+                        e.start.format("%a %d %b").to_string()
+                  } else {
+                        format!("{} {}", e.start.format("%a %d %b"), e.start.format("%H:%M"))
+                  };
+                  image.draw_string(10, y, &date_time_str, &epd::font::FONT12, fg, bg)
+            } else {
+                  let (_, mut dy) = image.draw_string(10, y, &e.start.format("%a %d %b").to_string(),
                         &epd::font::FONT16, fg, bg);
-                  date_y = edy;
-            }
-            if !e.all_day {
-                  let time_str = format!("{} - {}", e.start.format("%H:%M"), end.format("%H:%M"));
-                  let (_, ty) = image.draw_string(10, date_y + 2, &time_str, &epd::font::FONT12, fg, bg);
-                  date_y = ty;
-            }
+                  if end.date_naive() != e.start.date_naive() {
+                        let (_, edy) = image.draw_string(10, dy, &e.end.format("%a %d %b").to_string(),
+                              &epd::font::FONT16, fg, bg);
+                        dy = edy;
+                  }
+                  if !e.all_day {
+                        let time_str = format!("{} - {}", e.start.format("%H:%M"), end.format("%H:%M"));
+                        let (_, ty) = image.draw_string(10, dy + 2, &time_str, &epd::font::FONT12, fg, bg);
+                        dy = ty;
+                  }
+                  (0, dy)
+            };
 
-            // Right column: name and location
-            let (_, mut name_y) = image.draw_string(DIVIDER_X + 10, y, &e.name, &epd::font::FONT24, fg, bg);
-            if let Some(loc) = &e.location {
-                  let (_, ly) = image.draw_string(DIVIDER_X + 10, name_y + 2,
-                        &loc.replace("\\n", ", ").replace("\\", " "), &epd::font::FONT12, fg, bg);
-                  name_y = ly;
+            // Right column: name (and location for non-recurring)
+            let (_, mut name_y) = image.draw_string(DIVIDER_X + 10, y, &e.name, name_font, fg, bg);
+            if !e.is_recurring {
+                  if let Some(loc) = &e.location {
+                        let (_, ly) = image.draw_string(DIVIDER_X + 10, name_y + 2,
+                              &loc.replace("\\n", ", ").replace("\\", " "), &epd::font::FONT12, fg, bg);
+                        name_y = ly;
+                  }
             }
 
             // Forecast icon + max temp, right-aligned
