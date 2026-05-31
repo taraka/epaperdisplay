@@ -43,6 +43,7 @@ fn main() {
                   },
                   fetch_tick.recv() => {
                         cal = fetch_data();
+                        draw_cal(&mut display, &cal);
                   }
             }
       }
@@ -110,15 +111,17 @@ fn fetch_data() -> Vec<Event> {
       }).collect::<Vec<Event>>();
 
       output.sort_by(|a, b| {
-            a.start.cmp(&b.start)
+            a.start.cmp(&b.start).then(a.name.cmp(&b.name))
       });
 
       output
 }
 
 fn find_next_yearly_instance(dt: &DateTime<Utc>) -> DateTime<Utc> {
+      let now = Utc::now();
+      let today_start = now.sub(Duration::seconds(now.timestamp() % 86400));
       let mut mydt = dt.clone();
-      while mydt < Utc::now() {
+      while mydt < today_start {
             mydt = mydt.with_year(mydt.year() + 1).unwrap()
       }
       return mydt;
