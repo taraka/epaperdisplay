@@ -3,17 +3,19 @@ mod epd;
 use epd::display::d7in5_v2::Display;
 
 use ical;
-use chrono::{DateTime, Utc, Duration, Datelike};
+use chrono::{DateTime, Utc, Duration, Datelike, NaiveDate};
 use chan::chan_select;
+use serde::Deserialize;
 
 use std::ops::Sub;
 use std::collections::HashMap;
 
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 enum Repeat {
       NONE,
-      YEARLY
+      YEARLY,
+      WEEKLY,
 }
 
 struct Event {
@@ -25,6 +27,103 @@ struct Event {
       repeat: Repeat
 }
 
+struct WeatherData {
+      temperature: i32,
+      condition: &'static str,
+      weathercode: u32,
+      forecast: Vec<DailyForecast>,
+}
+
+struct DailyForecast {
+      date: NaiveDate,
+      temp_max: i32,
+      weathercode: u32,
+}
+
+#[derive(Deserialize)]
+struct GeoResponse {
+      results: Option<Vec<GeoLocation>>,
+}
+
+#[derive(Deserialize)]
+struct GeoLocation {
+      latitude: f64,
+      longitude: f64,
+}
+
+#[derive(Deserialize)]
+struct WeatherResponse {
+      current_weather: CurrentWeather,
+      daily: Option<DailyData>,
+}
+
+#[derive(Deserialize)]
+struct DailyData {
+      time: Vec<String>,
+      weathercode: Vec<u32>,
+      temperature_2m_max: Vec<f64>,
+}
+
+#[derive(Deserialize)]
+struct CurrentWeather {
+      temperature: f64,
+      weathercode: u32,
+}
+
+fn wmo_condition(code: u32) -> &'static str {
+      match code {
+            0       => "Clear",
+            1..=3   => "Cloudy",
+            45 | 48 => "Fog",
+            51..=57 => "Drizzle",
+            61..=67 => "Rain",
+            71..=77 => "Snow",
+            80..=82 => "Showers",
+            85 | 86 => "Snow showers",
+            95..=99 => "Thunder",
+            _       => "",
+      }
+}
+
+fn fetch_weather() -> Option<WeatherData> {
+      let town = std::env::var("TOWN").ok()?;
+
+      let geo_url = format!(
+            "https://geocoding-api.open-meteo.com/v1/search?name={}&count=1", town
+      );
+      let loc = reqwest::blocking::get(&geo_url).ok()?
+            .json::<GeoResponse>().ok()?
+            .results?
+            .into_iter().next()?;
+
+      let weather_url = format!(
+            "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current_weather=true&daily=weathercode,temperature_2m_max&timezone=UTC&forecast_days=14",
+            loc.latitude, loc.longitude
+      );
+      let resp = reqwest::blocking::get(&weather_url).ok()?
+            .json::<WeatherResponse>().ok()?;
+
+      let cw = resp.current_weather;
+
+      let forecast = resp.daily.map(|d| {
+            d.time.iter().zip(d.weathercode.iter()).zip(d.temperature_2m_max.iter())
+                  .filter_map(|((date_str, &code), &temp)| {
+                        NaiveDate::parse_from_str(date_str, "%Y-%m-%d").ok().map(|date| DailyForecast {
+                              date,
+                              temp_max: temp.round() as i32,
+                              weathercode: code,
+                        })
+                  }).collect()
+      }).unwrap_or_default();
+
+      Some(WeatherData {
+            temperature: cw.temperature.round() as i32,
+            condition: wmo_condition(cw.weathercode),
+            weathercode: cw.weathercode,
+            forecast,
+      })
+}
+
 
 fn main() {
       println!("e-Paper Init and Clear...");
@@ -32,18 +131,20 @@ fn main() {
       display.clear();
 
       let mut cal = fetch_data();
-      draw_cal(&mut display, &cal);
+      let mut weather = fetch_weather();
+      draw_cal(&mut display, &cal, weather.as_ref());
 
       let fetch_tick = chan::tick_ms(5 * 60 * 1000);
       let display_tick = chan::tick_ms(Display::update_rate());
       loop {
             chan_select! {
                   display_tick.recv() => {
-                        draw_cal(&mut display, &cal);
+                        draw_cal(&mut display, &cal, weather.as_ref());
                   },
                   fetch_tick.recv() => {
                         cal = fetch_data();
-                        draw_cal(&mut display, &cal);
+                        weather = fetch_weather();
+                        draw_cal(&mut display, &cal, weather.as_ref());
                   }
             }
       }
@@ -92,20 +193,41 @@ fn fetch_data() -> Vec<Event> {
 
       //println!("{:?}", today);
 
+      let today_start = now.sub(Duration::seconds(now.timestamp() % 86400));
+      let lookahead = today_start + Duration::weeks(8);
+
       let mut output = output.into_iter().filter(|e| {
             e.start >= today || e.repeat != Repeat::NONE
-      }).map(|e| {
+      }).flat_map(|e| {
             match e.repeat {
-                  Repeat::NONE => e,
-                  Repeat::YEARLY => {
-                        Event {
-                              name: e.name,
-                              location: e.location,
-                              start: find_next_yearly_instance(&e.start),
-                              end: find_next_yearly_instance(&e.end),
-                              all_day: e.all_day,
-                              repeat: e.repeat
+                  Repeat::NONE => vec![e],
+                  Repeat::YEARLY => vec![Event {
+                        start: find_next_yearly_instance(&e.start),
+                        end: find_next_yearly_instance(&e.end),
+                        name: e.name,
+                        location: e.location,
+                        all_day: e.all_day,
+                        repeat: e.repeat,
+                  }],
+                  Repeat::WEEKLY => {
+                        let duration = e.end - e.start;
+                        let mut dt = e.start;
+                        while dt < today_start {
+                              dt = dt + Duration::weeks(1);
                         }
+                        let mut instances = Vec::new();
+                        while dt <= lookahead {
+                              instances.push(Event {
+                                    name: e.name.clone(),
+                                    location: e.location.clone(),
+                                    start: dt,
+                                    end: dt + duration,
+                                    all_day: e.all_day,
+                                    repeat: Repeat::NONE,
+                              });
+                              dt = dt + Duration::weeks(1);
+                        }
+                        instances
                   }
             }
       }).collect::<Vec<Event>>();
@@ -127,13 +249,26 @@ fn find_next_yearly_instance(dt: &DateTime<Utc>) -> DateTime<Utc> {
       return mydt;
 }
 
+fn repeat_expired(rule: &str) -> bool {
+      if let Some(idx) = rule.find("UNTIL=") {
+            let until_val = rule[idx + 6..].split(';').next().unwrap_or("");
+            if until_val.len() >= 8 {
+                  if let Ok(until_date) = NaiveDate::parse_from_str(&until_val[..8], "%Y%m%d") {
+                        return until_date < Utc::now().date_naive();
+                  }
+            }
+      }
+      false
+}
+
 fn get_repeat(rrule: Option<&String>) -> Repeat {
       match rrule {
             Some(rule) => {
-                  if &rule[0..11] == "FREQ=YEARLY" {
-                        Repeat::YEARLY
+                  if rule.starts_with("FREQ=YEARLY") {
+                        if repeat_expired(rule) { Repeat::NONE } else { Repeat::YEARLY }
+                  } else if rule.starts_with("FREQ=WEEKLY") {
+                        if repeat_expired(rule) { Repeat::NONE } else { Repeat::WEEKLY }
                   } else {
-                        //eprintln!("Invalid repeat: {:?}", &rrule);
                         Repeat::NONE
                   }
             },
@@ -156,7 +291,140 @@ fn unpack_time_stamp(input: Option<&String>) -> (DateTime<Utc>, bool) {
       (values.0, values.1)
 }
 
-fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
+// Large cloud (for 28px icon).
+fn draw_cloud_shape(image: &mut epd::paint::Image, cx: u16, cy: u16, color: epd::paint::Color) {
+      let px1 = epd::paint::DotPixel::DotPixel1x1;
+      let fill = epd::paint::DrawFill::DrawFillFull;
+      image.draw_circle(cx.saturating_sub(7), cy, 4, color, px1, fill);
+      image.draw_circle(cx, cy.saturating_sub(4), 6, color, px1, fill);
+      image.draw_circle(cx + 7, cy.saturating_sub(1), 4, color, px1, fill);
+      image.draw_rectangle(cx.saturating_sub(11), cy, cx + 11, cy + 5, color, px1, fill);
+}
+
+// Small cloud (for 20px icon): two circles give a cleaner shape at this scale.
+fn draw_cloud_shape_small(image: &mut epd::paint::Image, cx: u16, cy: u16, color: epd::paint::Color) {
+      let px1 = epd::paint::DotPixel::DotPixel1x1;
+      let fill = epd::paint::DrawFill::DrawFillFull;
+      image.draw_circle(cx.saturating_sub(4), cy.saturating_sub(1), 3, color, px1, fill); // left bump
+      image.draw_circle(cx + 1, cy.saturating_sub(3), 4, color, px1, fill);               // main dome
+      image.draw_rectangle(cx.saturating_sub(7), cy + 1, cx + 5, cy + 3, color, px1, fill); // flat body
+}
+
+fn draw_weather_icon_small(image: &mut epd::paint::Image, x: u16, y: u16, code: u32, color: epd::paint::Color) {
+      let px1 = epd::paint::DotPixel::DotPixel1x1;
+      let px2 = epd::paint::DotPixel::DotPixel2x2;
+      let solid = epd::paint::LineStyle::LineStyleSolid;
+      let fill = epd::paint::DrawFill::DrawFillFull;
+
+      let cx = x + 10;
+      let cy = y + 10;
+
+      match code {
+            0 => {
+                  image.draw_circle(cx, cy, 3, color, px1, fill);
+                  for &(x1, y1, x2, y2) in &[
+                        (0i16, -5, 0i16, -7), (0, 5, 0, 7), (-5, 0, -7, 0), (5, 0, 7, 0),
+                        (-4, -4, -5, -5), (4, -4, 5, -5), (-4, 4, -5, 5), (4, 4, 5, 5),
+                  ] {
+                        image.draw_line(
+                              (cx as i16 + x1) as u16, (cy as i16 + y1) as u16,
+                              (cx as i16 + x2) as u16, (cy as i16 + y2) as u16,
+                              color, px1, solid,
+                        );
+                  }
+            }
+            1..=3 => {
+                  draw_cloud_shape_small(image, cx, cy, color);
+            }
+            45 | 48 => {
+                  for i in 0..3u16 {
+                        image.draw_line(cx.saturating_sub(7), cy.saturating_sub(4) + i * 4,
+                              cx + 7, cy.saturating_sub(4) + i * 4, color, px1, solid);
+                  }
+            }
+            51..=57 | 61..=67 | 80..=82 => {
+                  draw_cloud_shape_small(image, cx, cy.saturating_sub(3), color);
+                  for i in 0..3u16 {
+                        let rx = cx.saturating_sub(4) + i * 4;
+                        image.draw_line(rx, cy + 3, rx.saturating_sub(1), cy + 6, color, px1, solid);
+                  }
+            }
+            71..=77 | 85 | 86 => {
+                  draw_cloud_shape_small(image, cx, cy.saturating_sub(3), color);
+                  for i in 0..3u16 {
+                        image.draw_circle(cx.saturating_sub(4) + i * 4, cy + 6, 1, color, px1, fill);
+                  }
+            }
+            95..=99 => {
+                  draw_cloud_shape_small(image, cx, cy.saturating_sub(4), color);
+                  image.draw_line(cx + 1, cy + 2, cx.saturating_sub(1), cy + 5, color, px2, solid);
+                  image.draw_line(cx.saturating_sub(1), cy + 5, cx + 2, cy + 8, color, px2, solid);
+            }
+            _ => {}
+      }
+}
+
+fn draw_weather_icon(image: &mut epd::paint::Image, x: u16, y: u16, code: u32) {
+      let color = epd::paint::Color::White;
+      let px1 = epd::paint::DotPixel::DotPixel1x1;
+      let px2 = epd::paint::DotPixel::DotPixel2x2;
+      let solid = epd::paint::LineStyle::LineStyleSolid;
+      let fill = epd::paint::DrawFill::DrawFillFull;
+
+      let cx = x + 14;
+      let cy = y + 14;
+
+      match code {
+            0 => {
+                  // Sun: disc + 8 rays
+                  image.draw_circle(cx, cy, 5, color, px1, fill);
+                  for &(x1, y1, x2, y2) in &[
+                        (0i16, -8, 0i16, -11), (0, 8, 0, 11), (-8, 0, -11, 0), (8, 0, 11, 0),
+                        (-6, -6, -8, -8), (6, -6, 8, -8), (-6, 6, -8, 8), (6, 6, 8, 8),
+                  ] {
+                        image.draw_line(
+                              (cx as i16 + x1) as u16, (cy as i16 + y1) as u16,
+                              (cx as i16 + x2) as u16, (cy as i16 + y2) as u16,
+                              color, px2, solid,
+                        );
+                  }
+            }
+            1..=3 => {
+                  draw_cloud_shape(image, cx, cy, color);
+            }
+            45 | 48 => {
+                  // Fog: three horizontal bars
+                  for i in 0..3u16 {
+                        image.draw_line(cx.saturating_sub(10), cy.saturating_sub(5) + i * 5,
+                              cx + 10, cy.saturating_sub(5) + i * 5, color, px2, solid);
+                  }
+            }
+            51..=57 | 61..=67 | 80..=82 => {
+                  // Rain: cloud + diagonal drops
+                  draw_cloud_shape(image, cx, cy.saturating_sub(5), color);
+                  for i in 0..4u16 {
+                        let rx = cx.saturating_sub(6) + i * 4;
+                        image.draw_line(rx, cy + 3, rx.saturating_sub(2), cy + 8, color, px1, solid);
+                  }
+            }
+            71..=77 | 85 | 86 => {
+                  // Snow: cloud + dots
+                  draw_cloud_shape(image, cx, cy.saturating_sub(5), color);
+                  for i in 0..4u16 {
+                        image.draw_circle(cx.saturating_sub(6) + i * 4, cy + 7, 1, color, px1, fill);
+                  }
+            }
+            95..=99 => {
+                  // Thunder: cloud + lightning bolt
+                  draw_cloud_shape(image, cx, cy.saturating_sub(6), color);
+                  image.draw_line(cx + 2, cy + 2, cx.saturating_sub(2), cy + 6, color, px2, solid);
+                  image.draw_line(cx.saturating_sub(2), cy + 6, cx + 3, cy + 11, color, px2, solid);
+            }
+            _ => {}
+      }
+}
+
+fn draw_cal(display: &mut Display, cal: &Vec<Event>, weather: Option<&WeatherData>) {
       const HEADER_H: u16 = 36;
       const DIVIDER_X: u16 = 130;
 
@@ -171,10 +439,23 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
             epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::DrawFill::DrawFillFull);
       image.draw_string(10, 8, &now.format("%A %d %B %Y").to_string(),
             &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black);
+      if let Some(w) = weather {
+            let weather_str = format!("{}C  {}", w.temperature, w.condition);
+            let text_w = weather_str.len() as u16 * 14; // FONT20 is 14px wide
+            let icon_x = (790u16).saturating_sub(text_w + 6 + 28);
+            let text_x = icon_x + 28 + 6;
+            draw_weather_icon(&mut image, icon_x, 4, w.weathercode);
+            image.draw_string(text_x, 8, &weather_str,
+                  &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black);
+      }
 
       // Vertical divider
       image.draw_line(DIVIDER_X, HEADER_H, DIVIDER_X, epd::display::d7in5_v2::HEIGHT,
             epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid);
+
+      let forecast_map: HashMap<NaiveDate, &DailyForecast> = weather
+            .map(|w| w.forecast.iter().map(|f| (f.date, f)).collect())
+            .unwrap_or_default();
 
       let mut y: u16 = HEADER_H + 8;
       for e in cal {
@@ -227,6 +508,16 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>) {
                   let (_, ly) = image.draw_string(DIVIDER_X + 10, name_y + 2,
                         &loc.replace("\\n", ", ").replace("\\", " "), &epd::font::FONT12, fg, bg);
                   name_y = ly;
+            }
+
+            // Forecast icon + max temp, right-aligned
+            if let Some(f) = forecast_map.get(&e.start.date_naive()) {
+                  let temp_str = format!("{}C", f.temp_max);
+                  let temp_w = temp_str.len() as u16 * 7; // FONT12 is 7px wide
+                  let icon_x = (790u16).saturating_sub(temp_w + 4 + 20);
+                  let temp_x = icon_x + 20 + 4;
+                  draw_weather_icon_small(&mut image, icon_x, y + 2, f.weathercode, fg);
+                  image.draw_string(temp_x, y + 6, &temp_str, &epd::font::FONT12, fg, bg);
             }
 
             y = date_y.max(name_y);
