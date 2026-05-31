@@ -101,10 +101,6 @@ impl Display {
         self.turn_on_display();
     }
 
-    pub fn update_rate() -> u32 {
-        15 * 60 * 1000 //15 mins
-    }
-
     #[allow(dead_code)]
     fn sleep(&mut self)
     {
@@ -163,3 +159,5 @@ impl Display {
         self.wait_until_idle();
     }
 }
+
+pub const UPDATE_RATE: u32 = 15 * 60 * 1000; // 15 minutes

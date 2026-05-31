@@ -3,7 +3,7 @@ mod calendar;
 mod weather;
 mod render;
 
-use epd::display::d7in5_v2::Display;
+use epd::display::Display;
 use chan::chan_select;
 
 fn main() {
@@ -19,7 +19,7 @@ fn main() {
     let (mut cal, mut wx) = refresh(&mut display, location);
 
     let fetch_tick = chan::tick_ms(5 * 60 * 1000);
-    let display_tick = chan::tick_ms(Display::update_rate());
+    let display_tick = chan::tick_ms(epd::display::UPDATE_RATE);
     loop {
         chan_select! {
             display_tick.recv() => {

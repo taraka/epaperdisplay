@@ -74,7 +74,6 @@ impl Display {
         return true;
     }
 
-    pub fn update_rate() -> u32 {
-        100
-    }
 }
+
+pub const UPDATE_RATE: u32 = 100;

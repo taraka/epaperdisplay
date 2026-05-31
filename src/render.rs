@@ -4,7 +4,7 @@ use std::ops::Sub;
 
 use crate::calendar::Event;
 use crate::epd;
-use crate::epd::display::d7in5_v2::{Display, HEIGHT, WIDTH};
+use crate::epd::display::{Display, HEIGHT, WIDTH};
 use crate::weather::{DailyForecast, WeatherData};
 
 pub fn draw_cal(display: &mut Display, cal: &[Event], weather: Option<&WeatherData>) {
