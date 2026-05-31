@@ -16,6 +16,7 @@ enum Repeat {
       NONE,
       YEARLY,
       WEEKLY,
+      MONTHLY,
 }
 
 struct Event {
@@ -86,9 +87,8 @@ fn wmo_condition(code: u32) -> &'static str {
       }
 }
 
-fn fetch_weather() -> Option<WeatherData> {
+fn geocode_town() -> Option<(f64, f64)> {
       let town = std::env::var("TOWN").ok()?;
-
       let geo_url = format!(
             "https://geocoding-api.open-meteo.com/v1/search?name={}&count=1", town
       );
@@ -96,10 +96,13 @@ fn fetch_weather() -> Option<WeatherData> {
             .json::<GeoResponse>().ok()?
             .results?
             .into_iter().next()?;
+      Some((loc.latitude, loc.longitude))
+}
 
+fn fetch_weather(lat: f64, lon: f64) -> Option<WeatherData> {
       let weather_url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current_weather=true&daily=weathercode,temperature_2m_max&timezone=UTC&forecast_days=14",
-            loc.latitude, loc.longitude
+            lat, lon
       );
       let resp = reqwest::blocking::get(&weather_url).ok()?
             .json::<WeatherResponse>().ok()?;
@@ -131,8 +134,16 @@ fn main() {
       let mut display = Display::init();
       display.clear();
 
+      let location = geocode_town();
+      if location.is_none() && std::env::var("TOWN").is_ok() {
+            println!("Warning: could not geocode TOWN, weather disabled");
+      }
+
       let mut cal = fetch_data();
-      let mut weather = fetch_weather();
+      let mut weather = location.and_then(|(lat, lon)| fetch_weather(lat, lon));
+      if weather.is_none() && location.is_some() {
+            println!("Warning: weather fetch failed");
+      }
       draw_cal(&mut display, &cal, weather.as_ref());
 
       let fetch_tick = chan::tick_ms(5 * 60 * 1000);
@@ -144,7 +155,10 @@ fn main() {
                   },
                   fetch_tick.recv() => {
                         cal = fetch_data();
-                        weather = fetch_weather();
+                        weather = location.and_then(|(lat, lon)| fetch_weather(lat, lon));
+                        if weather.is_none() && location.is_some() {
+                              println!("Warning: weather fetch failed");
+                        }
                         draw_cal(&mut display, &cal, weather.as_ref());
                   }
             }
@@ -169,8 +183,14 @@ fn fetch_data() -> Vec<Event> {
             if  props.contains_key("SUMMARY") && props.contains_key("DTEND") && props.contains_key("DTSTART") {
                   let repeat = get_repeat(props.get("RRULE"));
 
-                  let (start, all_day) = unpack_time_stamp(props.get("DTSTART"));
-                  let (end, _) = unpack_time_stamp(props.get("DTEND"));
+                  let (start, all_day) = match unpack_time_stamp(props.get("DTSTART")) {
+                        Some(v) => v,
+                        None => continue,
+                  };
+                  let (end, _) = match unpack_time_stamp(props.get("DTEND")) {
+                        Some(v) => v,
+                        None => continue,
+                  };
 
 
 
@@ -191,15 +211,11 @@ fn fetch_data() -> Vec<Event> {
       }
 
       let now = Utc::now();
-      let today: DateTime<Utc> = now.sub(Duration::seconds(now.timestamp() % 86400)).sub(Duration::seconds(1));
-
-      //println!("{:?}", today);
-
       let today_start = now.sub(Duration::seconds(now.timestamp() % 86400));
       let lookahead = today_start + Duration::weeks(8);
 
       let mut output = output.into_iter().filter(|e| {
-            e.start >= today || e.repeat != Repeat::NONE
+            e.start >= today_start || e.repeat != Repeat::NONE
       }).flat_map(|e| {
             match e.repeat {
                   Repeat::NONE => vec![e],
@@ -232,6 +248,27 @@ fn fetch_data() -> Vec<Event> {
                               dt = dt + Duration::weeks(1);
                         }
                         instances
+                  },
+                  Repeat::MONTHLY => {
+                        let duration = e.end - e.start;
+                        let mut dt = e.start;
+                        while dt < today_start {
+                              dt = add_one_month(dt);
+                        }
+                        let mut instances = Vec::new();
+                        while dt <= lookahead {
+                              instances.push(Event {
+                                    name: e.name.clone(),
+                                    location: e.location.clone(),
+                                    start: dt,
+                                    end: dt + duration,
+                                    all_day: e.all_day,
+                                    is_recurring: true,
+                                    repeat: Repeat::NONE,
+                              });
+                              dt = add_one_month(dt);
+                        }
+                        instances
                   }
             }
       }).collect::<Vec<Event>>();
@@ -241,6 +278,16 @@ fn fetch_data() -> Vec<Event> {
       });
 
       output
+}
+
+fn add_one_month(dt: DateTime<Utc>) -> DateTime<Utc> {
+      let (year, month) = if dt.month() == 12 {
+            (dt.year() + 1, 1)
+      } else {
+            (dt.year(), dt.month() + 1)
+      };
+      dt.with_year(year).and_then(|d| d.with_month(month))
+            .unwrap_or_else(|| dt + Duration::days(28))
 }
 
 fn find_next_yearly_instance(dt: &DateTime<Utc>) -> DateTime<Utc> {
@@ -272,6 +319,8 @@ fn get_repeat(rrule: Option<&String>) -> Repeat {
                         if repeat_expired(rule) { Repeat::NONE } else { Repeat::YEARLY }
                   } else if rule.starts_with("FREQ=WEEKLY") {
                         if repeat_expired(rule) { Repeat::NONE } else { Repeat::WEEKLY }
+                  } else if rule.starts_with("FREQ=MONTHLY") {
+                        if repeat_expired(rule) { Repeat::NONE } else { Repeat::MONTHLY }
                   } else {
                         Repeat::NONE
                   }
@@ -280,19 +329,23 @@ fn get_repeat(rrule: Option<&String>) -> Repeat {
       }
 }
 
-fn unpack_time_stamp(input: Option<&String>) -> (DateTime<Utc>, bool) {
+fn unpack_time_stamp(input: Option<&String>) -> Option<(DateTime<Utc>, bool)> {
       const FORMAT: &str = "%Y%m%dT%H%M%SZ%z";
-      let input_string = input.unwrap();
-      //println!("{}", input_string);
-      let values = match DateTime::parse_from_str(&format!("{}{}", input_string, "+0000")[..], FORMAT) {
+      let input_string = input?;
+      let result = match DateTime::parse_from_str(&format!("{}{}", input_string, "+0000")[..], FORMAT) {
             Ok(d) => (d.with_timezone(&Utc), false),
             Err(_) => match DateTime::parse_from_str(&format!("{}{}", input_string, "Z+0000")[..], FORMAT) {
                   Ok(d1) => (d1.with_timezone(&Utc), false),
-                  Err(_) => (DateTime::parse_from_str(&format!("{}{}", input_string, "T000000Z+0000")[..], FORMAT).unwrap().with_timezone(&Utc), true)
+                  Err(_) => match DateTime::parse_from_str(&format!("{}{}", input_string, "T000000Z+0000")[..], FORMAT) {
+                        Ok(d2) => (d2.with_timezone(&Utc), true),
+                        Err(e) => {
+                              println!("Warning: could not parse timestamp {:?}: {}", input_string, e);
+                              return None;
+                        }
+                  }
             }
       };
-
-      (values.0, values.1)
+      Some(result)
 }
 
 // Large cloud (for 28px icon).
@@ -490,7 +543,6 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>, weather: Option<&WeatherDat
                   if !e.all_day { h += 14; }
                   h
             };
-            let _ = date_h; // suppress unused warning if needed
             let mut name_h: u16 = name_font_h;
             if !e.is_recurring { if e.location.is_some() { name_h += 14; } }
             let row_h = date_h.max(name_h);
@@ -527,7 +579,10 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>, weather: Option<&WeatherDat
             };
 
             // Right column: name (and location for non-recurring)
-            let (_, mut name_y) = image.draw_string(DIVIDER_X + 10, y, &e.name, name_font, fg, bg);
+            // Truncate name so it doesn't overflow into the forecast icon area (~50px on the right)
+            let max_name_chars = ((790u16.saturating_sub(DIVIDER_X + 10 + 50)) / name_font.width) as usize;
+            let display_name: String = e.name.chars().take(max_name_chars).collect();
+            let (_, mut name_y) = image.draw_string(DIVIDER_X + 10, y, &display_name, name_font, fg, bg);
             if !e.is_recurring {
                   if let Some(loc) = &e.location {
                         let (_, ly) = image.draw_string(DIVIDER_X + 10, name_y + 2,
@@ -536,8 +591,14 @@ fn draw_cal(display: &mut Display, cal: &Vec<Event>, weather: Option<&WeatherDat
                   }
             }
 
-            // Forecast icon + max temp, right-aligned
-            if let Some(f) = forecast_map.get(&e.start.date_naive()) {
+            // Forecast icon + max temp, right-aligned.
+            // For multi-day events ongoing today, look up today's forecast rather than the (past) start date.
+            let forecast_date = if is_today && e.start.date_naive() < today {
+                  today
+            } else {
+                  e.start.date_naive()
+            };
+            if let Some(f) = forecast_map.get(&forecast_date) {
                   let temp_str = format!("{}C", f.temp_max);
                   let temp_w = temp_str.len() as u16 * 7; // FONT12 is 7px wide
                   let icon_x = (790u16).saturating_sub(temp_w + 4 + 20);
