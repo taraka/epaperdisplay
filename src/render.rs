@@ -49,6 +49,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: Option<&WeatherDa
         .unwrap_or_default();
 
     let mut y: u16 = HEADER_H + 8;
+    let mut events_drawn: usize = 0;
     for e in cal {
         if y + 24 >= HEIGHT {
             break;
@@ -153,6 +154,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: Option<&WeatherDa
             image.draw_string(temp_x, y + 6, &temp_str, &epd::font::FONT12, fg, bg);
         }
 
+        events_drawn += 1;
         y = date_y.max(name_y);
 
         image.draw_line(
@@ -162,7 +164,12 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: Option<&WeatherDa
         y += 16;
     }
 
-    display.display(image);
+    let updated = display.display(image);
+    if updated {
+        log::info!("Display refreshed ({} event(s) shown)", events_drawn);
+    } else {
+        log::debug!("Display skipped — image unchanged");
+    }
 }
 
 enum IconSize {

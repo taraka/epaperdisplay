@@ -7,13 +7,28 @@ use epd::display::Display;
 use chan::chan_select;
 
 fn main() {
-    println!("e-Paper Init and Clear...");
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp_secs()
+        .init();
+
+    log::info!("e-Paper init and clear");
     let mut display = Display::init();
     display.clear();
 
-    let location = weather::geocode_town();
-    if location.is_none() && std::env::var("TOWN").is_ok() {
-        println!("Warning: could not geocode TOWN, weather disabled");
+    let town = std::env::var("TOWN").ok();
+    let cal_url = std::env::var("ICALADDR").ok();
+    match &town {
+        Some(t) => log::info!("Weather town: {}", t),
+        None    => log::warn!("TOWN not set, weather disabled"),
+    }
+    match &cal_url {
+        Some(_) => log::info!("Calendar URL: configured"),
+        None    => log::error!("ICALADDR not set — calendar will be empty"),
+    }
+
+    let location = town.as_deref().and_then(|_| weather::geocode_town());
+    if location.is_none() && town.is_some() {
+        log::warn!("Could not geocode town, weather disabled");
     }
 
     let (mut cal, mut wx) = refresh(&mut display, location);
@@ -41,7 +56,7 @@ fn refresh(
     let cal = calendar::fetch_data();
     let wx = location.and_then(|(lat, lon)| weather::fetch_weather(lat, lon));
     if wx.is_none() && location.is_some() {
-        println!("Warning: weather fetch failed");
+        log::warn!("Weather fetch failed");
     }
     render::draw_cal(display, &cal, wx.as_ref());
     (cal, wx)

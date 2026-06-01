@@ -22,18 +22,29 @@ pub struct Event {
 }
 
 pub fn fetch_data() -> Vec<Event> {
-    println!("Fetching cal");
-    let resp = reqwest::blocking::get(
-        &std::env::var("ICALADDR").expect("you need to set ICALADDR"),
-    )
-    .expect("Request failed")
-    .text()
-    .unwrap();
+    log::info!("Fetching calendar");
 
-    let cal = ical::IcalParser::new(resp.as_bytes())
-        .next()
-        .expect("Parsing failed")
-        .expect("Really failed");
+    let url = match std::env::var("ICALADDR") {
+        Ok(u) => u,
+        Err(_) => {
+            log::error!("ICALADDR not set, returning empty calendar");
+            return Vec::new();
+        }
+    };
+
+    let body = match reqwest::blocking::get(&url) {
+        Ok(r) => match r.text() {
+            Ok(t) => t,
+            Err(e) => { log::error!("Calendar response unreadable: {}", e); return Vec::new(); }
+        },
+        Err(e) => { log::error!("Calendar request failed: {}", e); return Vec::new(); }
+    };
+
+    let cal = match ical::IcalParser::new(body.as_bytes()).next() {
+        Some(Ok(c)) => c,
+        Some(Err(e)) => { log::error!("Calendar parse failed: {}", e); return Vec::new(); }
+        None => { log::error!("Calendar response was empty"); return Vec::new(); }
+    };
 
     let mut output = Vec::new();
 
@@ -96,10 +107,17 @@ pub fn fetch_data() -> Vec<Event> {
         .collect::<Vec<Event>>();
 
     output.sort_by(|a, b| a.start.cmp(&b.start).then(a.name.cmp(&b.name)));
+
+    log::info!("Loaded {} upcoming event(s)", output.len());
     output
 }
 
-fn expand_recurring(e: Event, today_start: DateTime<Utc>, lookahead: DateTime<Utc>, step: Duration) -> Vec<Event> {
+fn expand_recurring(
+    e: Event,
+    today_start: DateTime<Utc>,
+    lookahead: DateTime<Utc>,
+    step: Duration,
+) -> Vec<Event> {
     let duration = e.end - e.start;
     let mut dt = e.start;
     while dt < today_start {
@@ -121,7 +139,11 @@ fn expand_recurring(e: Event, today_start: DateTime<Utc>, lookahead: DateTime<Ut
     instances
 }
 
-fn expand_recurring_monthly(e: Event, today_start: DateTime<Utc>, lookahead: DateTime<Utc>) -> Vec<Event> {
+fn expand_recurring_monthly(
+    e: Event,
+    today_start: DateTime<Utc>,
+    lookahead: DateTime<Utc>,
+) -> Vec<Event> {
     let duration = e.end - e.start;
     let mut dt = e.start;
     while dt < today_start {
@@ -186,6 +208,7 @@ fn get_repeat(rrule: Option<&String>) -> Repeat {
             } else if rule.starts_with("FREQ=MONTHLY") {
                 if repeat_expired(rule) { Repeat::NONE } else { Repeat::MONTHLY }
             } else {
+                log::debug!("Unsupported RRULE, ignoring: {}", rule);
                 Repeat::NONE
             }
         }
@@ -206,7 +229,7 @@ fn unpack_time_stamp(input: Option<&String>) -> Option<(DateTime<Utc>, bool)> {
             ) {
                 Ok(d2) => (d2.with_timezone(&Utc), true),
                 Err(e) => {
-                    println!("Warning: could not parse timestamp {:?}: {}", input_string, e);
+                    log::warn!("Could not parse timestamp {:?}: {}", input_string, e);
                     return None;
                 }
             },

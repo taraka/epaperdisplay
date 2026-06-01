@@ -27,7 +27,7 @@ struct GeoLocation {
 
 #[derive(Deserialize)]
 struct WeatherResponse {
-    current_weather: CurrentWeather,
+    current: CurrentWeather,
     daily: Option<DailyData>,
 }
 
@@ -40,7 +40,7 @@ struct DailyData {
 
 #[derive(Deserialize)]
 struct CurrentWeather {
-    temperature: f64,
+    temperature_2m: f64,
     weathercode: u32,
 }
 
@@ -65,27 +65,35 @@ pub fn geocode_town() -> Option<(f64, f64)> {
         "https://geocoding-api.open-meteo.com/v1/search?name={}&count=1",
         town
     );
-    let loc = reqwest::blocking::get(&geo_url)
-        .ok()?
-        .json::<GeoResponse>()
-        .ok()?
-        .results?
-        .into_iter()
-        .next()?;
+    let resp = reqwest::blocking::get(&geo_url);
+    let loc = match resp {
+        Err(e) => { log::warn!("Geocoding request failed: {}", e); return None; }
+        Ok(r) => match r.json::<GeoResponse>() {
+            Err(e) => { log::warn!("Geocoding parse failed: {}", e); return None; }
+            Ok(g) => g.results?.into_iter().next()?,
+        }
+    };
     Some((loc.latitude, loc.longitude))
 }
 
 pub fn fetch_weather(lat: f64, lon: f64) -> Option<WeatherData> {
     let weather_url = format!(
-        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current_weather=true&daily=weathercode,temperature_2m_max&timezone=UTC&forecast_days=14",
+        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,weathercode&daily=weathercode,temperature_2m_max&timezone=UTC&forecast_days=14",
         lat, lon
     );
-    let resp = reqwest::blocking::get(&weather_url)
-        .ok()?
-        .json::<WeatherResponse>()
-        .ok()?;
+    let body = match reqwest::blocking::get(&weather_url) {
+        Err(e) => { log::warn!("Weather request failed: {}", e); return None; }
+        Ok(r) => match r.text() {
+            Err(e) => { log::warn!("Weather response unreadable: {}", e); return None; }
+            Ok(t) => t,
+        }
+    };
+    let resp = match serde_json::from_str::<WeatherResponse>(&body) {
+        Err(e) => { log::warn!("Weather parse failed: {}\nBody: {}", e, &body[..body.len().min(200)]); return None; }
+        Ok(r) => r,
+    };
 
-    let cw = resp.current_weather;
+    let cw = resp.current;
 
     let forecast = resp
         .daily
@@ -108,7 +116,7 @@ pub fn fetch_weather(lat: f64, lon: f64) -> Option<WeatherData> {
         .unwrap_or_default();
 
     Some(WeatherData {
-        temperature: cw.temperature.round() as i32,
+        temperature: cw.temperature_2m.round() as i32,
         condition: wmo_condition(cw.weathercode),
         weathercode: cw.weathercode,
         forecast,
