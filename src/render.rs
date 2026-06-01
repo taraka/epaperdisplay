@@ -1,4 +1,4 @@
-use chrono::{Duration, Local, Utc};
+use chrono::{Duration, Local};
 use std::collections::HashMap;
 
 use crate::calendar::Event;
@@ -6,91 +6,94 @@ use crate::epd;
 use crate::epd::display::{Display, HEIGHT, WIDTH};
 use crate::weather::{DailyForecast, WeatherData};
 
+const HEADER_H: u16 = 36;
+const DIVIDER_X: u16 = 130;
+
 pub enum WeatherStatus<'a> {
     Available(&'a WeatherData),
     Unavailable,
     Disabled,
 }
 
-pub fn draw_error(display: &mut Display, message: &str) {
-    log::warn!("Displaying error on screen: {}", message);
-    const HEADER_H: u16 = 36;
+// ── Header ────────────────────────────────────────────────────────────────────
 
-    let mut image = epd::paint::new_image(WIDTH, HEIGHT, epd::paint::Color::White);
-    image.clear(epd::paint::Color::White);
-
-    let now = Utc::now();
+fn draw_header(image: &mut epd::paint::Image, weather: &WeatherStatus) {
     image.draw_rectangle(
         0, 0, WIDTH, HEADER_H,
-        epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::DrawFill::DrawFillFull,
+        epd::paint::Color::Black,
+        epd::paint::DotPixel::DotPixel1x1,
+        epd::paint::DrawFill::DrawFillFull,
     );
-    image.draw_string(
-        10, 8, &now.format("%A %d %B %Y").to_string(),
-        &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
-    );
-
-    image.draw_string(
-        20, HEADER_H + 20, "Error", &epd::font::FONT24,
-        epd::paint::Color::Black, epd::paint::Color::White,
-    );
-    image.draw_line(
-        20, HEADER_H + 48, WIDTH - 20, HEADER_H + 48,
-        epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid,
-    );
-    image.draw_string(
-        20, HEADER_H + 60, message, &epd::font::FONT16,
-        epd::paint::Color::Black, epd::paint::Color::White,
-    );
-
-    display.display(image);
-}
-
-pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
-    const HEADER_H: u16 = 36;
-    const DIVIDER_X: u16 = 130;
-
-    let mut image = epd::paint::new_image(WIDTH, HEIGHT, epd::paint::Color::White);
-    image.clear(epd::paint::Color::White);
 
     let now = Local::now();
-    let today = now.date_naive();
-
-    // Header bar
-    image.draw_rectangle(
-        0, 0, WIDTH, HEADER_H,
-        epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::DrawFill::DrawFillFull,
-    );
     image.draw_string(
         10, 8, &now.format("%A %d %B %Y").to_string(),
         &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
     );
-    match &weather {
+
+    match weather {
         WeatherStatus::Available(w) => {
             let weather_str = format!("{}C  {}", w.temperature, w.condition);
             let text_w = weather_str.len() as u16 * epd::font::FONT20.width;
             let icon_x = (790u16).saturating_sub(text_w + 6 + 28);
             let text_x = icon_x + 28 + 6;
-            draw_weather_icon(&mut image, icon_x, 4, w.weathercode, epd::paint::Color::White, IconSize::Large);
+            draw_weather_icon(image, icon_x, 4, w.weathercode, epd::paint::Color::White, IconSize::Large);
             image.draw_string(
                 text_x, 8, &weather_str,
                 &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
             );
         }
         WeatherStatus::Unavailable => {
-            image.draw_string(
-                (790u16).saturating_sub(14 * epd::font::FONT20.width), 8,
-                "Weather unavailable",
-                &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
-            );
+            let label = "Weather unavailable";
+            let x = (790u16).saturating_sub(label.len() as u16 * epd::font::FONT20.width);
+            image.draw_string(x, 8, label, &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black);
         }
         WeatherStatus::Disabled => {}
     }
+}
 
-    // Vertical divider
+// ── Public drawing functions ──────────────────────────────────────────────────
+
+pub fn draw_error(display: &mut Display, message: &str) {
+    log::warn!("Displaying error on screen: {}", message);
+
+    let mut image = epd::paint::new_image(WIDTH, HEIGHT, epd::paint::Color::White);
+    image.clear(epd::paint::Color::White);
+
+    draw_header(&mut image, &WeatherStatus::Disabled);
+
+    image.draw_string(
+        20, HEADER_H + 20, "Error",
+        &epd::font::FONT24, epd::paint::Color::Black, epd::paint::Color::White,
+    );
+    image.draw_line(
+        20, HEADER_H + 48, WIDTH - 20, HEADER_H + 48,
+        epd::paint::Color::Black,
+        epd::paint::DotPixel::DotPixel1x1,
+        epd::paint::LineStyle::LineStyleSolid,
+    );
+    image.draw_string(
+        20, HEADER_H + 58, message,
+        &epd::font::FONT16, epd::paint::Color::Black, epd::paint::Color::White,
+    );
+
+    display.display(image);
+}
+
+pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
+    let mut image = epd::paint::new_image(WIDTH, HEIGHT, epd::paint::Color::White);
+    image.clear(epd::paint::Color::White);
+
+    draw_header(&mut image, &weather);
+
     image.draw_line(
         DIVIDER_X, HEADER_H, DIVIDER_X, HEIGHT,
-        epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid,
+        epd::paint::Color::Black,
+        epd::paint::DotPixel::DotPixel1x1,
+        epd::paint::LineStyle::LineStyleSolid,
     );
+
+    let today = Local::now().date_naive();
 
     let forecast_map: HashMap<chrono::NaiveDate, &DailyForecast> = match &weather {
         WeatherStatus::Available(w) => w.forecast.iter().map(|f| (f.date, f)).collect(),
@@ -99,10 +102,12 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
 
     let mut y: u16 = HEADER_H + 8;
     let mut events_drawn: usize = 0;
+
     for e in cal {
         if y + 24 >= HEIGHT {
             break;
         }
+
         let start_local = e.start.with_timezone(&Local);
         let end_local = match e.all_day {
             true => (e.end - Duration::seconds(1)).with_timezone(&Local),
@@ -129,24 +134,26 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
             if !e.all_day { h += 14; }
             h
         };
-        let mut name_h: u16 = name_font_h;
-        if !e.is_recurring {
-            if e.location.is_some() { name_h += 14; }
-        }
+        let mut name_h = name_font_h;
+        if !e.is_recurring && e.location.is_some() { name_h += 14; }
         let row_h = date_h.max(name_h);
 
         if is_today {
             image.draw_rectangle(
                 0, y.saturating_sub(4), WIDTH, y + row_h + 4,
-                epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::DrawFill::DrawFillFull,
+                epd::paint::Color::Black,
+                epd::paint::DotPixel::DotPixel1x1,
+                epd::paint::DrawFill::DrawFillFull,
             );
             image.draw_line(
                 DIVIDER_X, y.saturating_sub(4), DIVIDER_X, y + row_h + 4,
-                epd::paint::Color::White, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid,
+                epd::paint::Color::White,
+                epd::paint::DotPixel::DotPixel1x1,
+                epd::paint::LineStyle::LineStyleSolid,
             );
         }
 
-        // Left column: date and time (all formatted in local time)
+        // Left column: date and time
         let (_, date_y) = if e.is_recurring {
             let date_time_str = if e.all_day {
                 start_local.format("%a %d %b").to_string()
@@ -169,18 +176,18 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
                 let (_, ty) = image.draw_string(10, dy + 2, &time_str, &epd::font::FONT12, fg, bg);
                 dy = ty;
             }
-            (0, dy)
+            (0u16, dy)
         };
 
-        // Right column: name (truncated to avoid overflowing into forecast icon area)
-        let max_name_chars =
-            ((790u16.saturating_sub(DIVIDER_X + 10 + 50)) / name_font.width) as usize;
+        // Right column: name vertically centered within the row, truncated to avoid forecast icon
+        let name_y_start = y + (row_h.saturating_sub(name_h)) / 2;
+        let max_name_chars = ((790u16.saturating_sub(DIVIDER_X + 10 + 50)) / name_font.width) as usize;
         let display_name: String = e.name.chars().take(max_name_chars).collect();
-        let (_, mut name_y) = image.draw_string(DIVIDER_X + 10, y, &display_name, name_font, fg, bg);
+        let (_, mut name_y) = image.draw_string(DIVIDER_X + 10, name_y_start, &display_name, name_font, fg, bg);
         if !e.is_recurring {
             if let Some(loc) = &e.location {
                 let (_, ly) = image.draw_string(
-                    DIVIDER_X + 10, name_y + 2,
+                    DIVIDER_X + 10, name_y,
                     &loc.replace("\\n", ", ").replace("\\", " "),
                     &epd::font::FONT12, fg, bg,
                 );
@@ -188,8 +195,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
             }
         }
 
-        // Forecast icon + max temp, right-aligned.
-        // For multi-day events ongoing today, look up today's forecast rather than the (past) start date.
+        // Forecast icon + max temp, right-aligned
         let forecast_date = if is_today && start_local.date_naive() < today {
             today
         } else {
@@ -209,7 +215,9 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
 
         image.draw_line(
             10, y + 8, 790, y + 8,
-            epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid,
+            epd::paint::Color::Black,
+            epd::paint::DotPixel::DotPixel1x1,
+            epd::paint::LineStyle::LineStyleSolid,
         );
         y += 16;
     }
@@ -221,6 +229,8 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
         log::debug!("Display skipped — image unchanged");
     }
 }
+
+// ── Weather icons ─────────────────────────────────────────────────────────────
 
 enum IconSize {
     Small,
