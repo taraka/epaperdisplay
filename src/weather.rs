@@ -6,6 +6,8 @@ pub struct WeatherData {
     pub condition: &'static str,
     pub weathercode: u32,
     pub forecast: Vec<DailyForecast>,
+    pub sunrise: Option<String>,
+    pub sunset: Option<String>,
 }
 
 pub struct DailyForecast {
@@ -36,6 +38,8 @@ struct DailyData {
     time: Vec<String>,
     weathercode: Vec<u32>,
     temperature_2m_max: Vec<f64>,
+    sunrise: Vec<String>,
+    sunset: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -78,7 +82,7 @@ pub fn geocode_town() -> Option<(f64, f64)> {
 
 pub fn fetch_weather(lat: f64, lon: f64) -> Option<WeatherData> {
     let weather_url = format!(
-        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,weathercode&daily=weathercode,temperature_2m_max&timezone=Europe%2FLondon&forecast_days=14",
+        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,weathercode&daily=weathercode,temperature_2m_max,sunrise,sunset&timezone=Europe%2FLondon&forecast_days=14",
         lat, lon
     );
     let body = match reqwest::blocking::get(&weather_url) {
@@ -95,11 +99,23 @@ pub fn fetch_weather(lat: f64, lon: f64) -> Option<WeatherData> {
 
     let cw = resp.current;
 
-    let forecast = resp
-        .daily
-        .map(|d| {
-            d.time
-                .iter()
+    let today = NaiveDate::from(chrono::Local::now().date_naive());
+
+    let (forecast, sunrise, sunset) = match resp.daily {
+        None => (Vec::new(), None, None),
+        Some(d) => {
+            let today_idx = d.time.iter().position(|t| {
+                NaiveDate::parse_from_str(t, "%Y-%m-%d").ok().as_ref() == Some(&today)
+            });
+            let sunrise = today_idx
+                .and_then(|i| d.sunrise.get(i))
+                .and_then(|s| s.split('T').nth(1))
+                .map(|t| t[..5].to_string());
+            let sunset = today_idx
+                .and_then(|i| d.sunset.get(i))
+                .and_then(|s| s.split('T').nth(1))
+                .map(|t| t[..5].to_string());
+            let items = d.time.iter()
                 .zip(d.weathercode.iter())
                 .zip(d.temperature_2m_max.iter())
                 .filter_map(|((date_str, &code), &temp)| {
@@ -111,14 +127,17 @@ pub fn fetch_weather(lat: f64, lon: f64) -> Option<WeatherData> {
                             weathercode: code,
                         })
                 })
-                .collect()
-        })
-        .unwrap_or_default();
+                .collect();
+            (items, sunrise, sunset)
+        }
+    };
 
     Some(WeatherData {
         temperature: cw.temperature_2m.round() as i32,
         condition: wmo_condition(cw.weathercode),
         weathercode: cw.weathercode,
         forecast,
+        sunrise,
+        sunset,
     })
 }

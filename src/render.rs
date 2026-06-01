@@ -7,6 +7,7 @@ use crate::epd::display::{Display, HEIGHT, WIDTH};
 use crate::weather::{DailyForecast, WeatherData};
 
 const HEADER_H: u16 = 36;
+const FOOTER_H: u16 = 22;
 const DIVIDER_X: u16 = 130;
 
 pub enum WeatherStatus<'a> {
@@ -87,7 +88,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
     draw_header(&mut image, &weather);
 
     image.draw_line(
-        DIVIDER_X, HEADER_H, DIVIDER_X, HEIGHT,
+        DIVIDER_X, HEADER_H, DIVIDER_X, HEIGHT - FOOTER_H,
         epd::paint::Color::Black,
         epd::paint::DotPixel::DotPixel1x1,
         epd::paint::LineStyle::LineStyleSolid,
@@ -104,7 +105,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
     let mut events_drawn: usize = 0;
 
     for e in cal {
-        if y + 24 >= HEIGHT {
+        if y + 24 >= HEIGHT - FOOTER_H {
             break;
         }
 
@@ -227,11 +228,35 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
         y += 16;
     }
 
+    draw_footer(&mut image, &weather);
+
     let updated = display.display(image);
     if updated {
         log::info!("Display refreshed ({} event(s) shown)", events_drawn);
     } else {
         log::debug!("Display skipped — image unchanged");
+    }
+}
+
+fn draw_footer(image: &mut epd::paint::Image, weather: &WeatherStatus) {
+    let y = HEIGHT - FOOTER_H;
+    image.draw_rectangle(
+        0, y, WIDTH, HEIGHT,
+        epd::paint::Color::Black,
+        epd::paint::DotPixel::DotPixel1x1,
+        epd::paint::DrawFill::DrawFillFull,
+    );
+
+    let now = Local::now();
+    let updated = format!("Updated {}", now.format("%H:%M"));
+    image.draw_string(10, y + 4, &updated, &epd::font::FONT12, epd::paint::Color::White, epd::paint::Color::Black);
+
+    if let WeatherStatus::Available(w) = weather {
+        if let (Some(rise), Some(set)) = (&w.sunrise, &w.sunset) {
+            let sun_str = format!("Sunrise {}  Sunset {}", rise, set);
+            let text_w = sun_str.len() as u16 * epd::font::FONT12.width;
+            image.draw_string(WIDTH - text_w - 10, y + 4, &sun_str, &epd::font::FONT12, epd::paint::Color::White, epd::paint::Color::Black);
+        }
     }
 }
 
