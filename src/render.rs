@@ -182,7 +182,11 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
         // Right column: name vertically centered within the row, truncated to avoid forecast icon
         let name_y_start = y + (row_h.saturating_sub(name_h)) / 2;
         let max_name_chars = ((790u16.saturating_sub(DIVIDER_X + 10 + 50)) / name_font.width) as usize;
-        let display_name: String = e.name.chars().take(max_name_chars).collect();
+        let display_name: String = if e.name.chars().count() > max_name_chars {
+            e.name.chars().take(max_name_chars.saturating_sub(1)).collect::<String>() + "…"
+        } else {
+            e.name.chars().take(max_name_chars).collect()
+        };
         let (_, mut name_y) = image.draw_string(DIVIDER_X + 10, name_y_start, &display_name, name_font, fg, bg);
         if !e.is_recurring {
             if let Some(loc) = &e.location {
@@ -206,8 +210,9 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
             let temp_w = temp_str.len() as u16 * epd::font::FONT12.width;
             let icon_x = (790u16).saturating_sub(temp_w + 4 + 20);
             let temp_x = icon_x + 20 + 4;
-            draw_weather_icon(&mut image, icon_x, y + 2, f.weathercode, fg, IconSize::Small);
-            image.draw_string(temp_x, y + 6, &temp_str, &epd::font::FONT12, fg, bg);
+            let icon_y = y + (row_h.saturating_sub(20)) / 2;
+            draw_weather_icon(&mut image, icon_x, icon_y, f.weathercode, fg, IconSize::Small);
+            image.draw_string(temp_x, y + (row_h.saturating_sub(12)) / 2, &temp_str, &epd::font::FONT12, fg, bg);
         }
 
         events_drawn += 1;

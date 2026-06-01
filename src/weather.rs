@@ -78,7 +78,7 @@ pub fn geocode_town() -> Option<(f64, f64)> {
 
 pub fn fetch_weather(lat: f64, lon: f64) -> Option<WeatherData> {
     let weather_url = format!(
-        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,weathercode&daily=weathercode,temperature_2m_max&timezone=UTC&forecast_days=14",
+        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,weathercode&daily=weathercode,temperature_2m_max&timezone=Europe%2FLondon&forecast_days=14",
         lat, lon
     );
     let body = match reqwest::blocking::get(&weather_url) {

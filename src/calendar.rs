@@ -3,6 +3,8 @@ use ical;
 use std::collections::HashMap;
 use std::ops::Sub;
 
+const LOOKAHEAD_WEEKS: i64 = 8;
+
 #[derive(PartialEq, Clone)]
 enum Repeat {
     NONE,
@@ -77,7 +79,7 @@ pub fn fetch_data() -> Result<Vec<Event>, String> {
 
     let now = Utc::now();
     let today_start = now.sub(Duration::seconds(now.timestamp() % 86400));
-    let lookahead = today_start + Duration::weeks(8);
+    let lookahead = today_start + Duration::weeks(LOOKAHEAD_WEEKS);
 
     let mut output = output
         .into_iter()
@@ -85,8 +87,8 @@ pub fn fetch_data() -> Result<Vec<Event>, String> {
         .flat_map(|e| match e.repeat {
             Repeat::NONE => vec![e],
             Repeat::YEARLY => vec![Event {
-                start: find_next_yearly_instance(&e.start),
-                end: find_next_yearly_instance(&e.end),
+                start: find_next_yearly_instance(&e.start, today_start),
+                end: find_next_yearly_instance(&e.end, today_start),
                 name: e.name,
                 location: e.location,
                 all_day: e.all_day,
@@ -168,9 +170,7 @@ fn add_one_month(dt: DateTime<Utc>) -> DateTime<Utc> {
         .unwrap_or_else(|| dt + Duration::days(28))
 }
 
-fn find_next_yearly_instance(dt: &DateTime<Utc>) -> DateTime<Utc> {
-    let now = Utc::now();
-    let today_start = now.sub(Duration::seconds(now.timestamp() % 86400));
+fn find_next_yearly_instance(dt: &DateTime<Utc>, today_start: DateTime<Utc>) -> DateTime<Utc> {
     let mut mydt = *dt;
     while mydt < today_start {
         mydt = mydt.with_year(mydt.year() + 1).unwrap();
@@ -193,11 +193,11 @@ fn repeat_expired(rule: &str) -> bool {
 fn get_repeat(rrule: Option<&String>) -> Repeat {
     match rrule {
         Some(rule) => {
-            if rule.starts_with("FREQ=YEARLY") {
+            if rule.contains("FREQ=YEARLY") {
                 if repeat_expired(rule) { Repeat::NONE } else { Repeat::YEARLY }
-            } else if rule.starts_with("FREQ=WEEKLY") {
+            } else if rule.contains("FREQ=WEEKLY") {
                 if repeat_expired(rule) { Repeat::NONE } else { Repeat::WEEKLY }
-            } else if rule.starts_with("FREQ=MONTHLY") {
+            } else if rule.contains("FREQ=MONTHLY") {
                 if repeat_expired(rule) { Repeat::NONE } else { Repeat::MONTHLY }
             } else {
                 log::debug!("Unsupported RRULE, ignoring: {}", rule);

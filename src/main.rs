@@ -37,19 +37,19 @@ fn main() {
     if location.is_none() && town.is_some() {
         log::warn!("Could not geocode town, weather disabled");
     }
-    let weather_configured = town.is_some();
+    let weather_enabled = town.is_some();
 
-    let mut state = fetch_and_draw(&mut display, location, weather_configured);
+    let mut state = fetch_and_draw(&mut display, location, weather_enabled);
 
     let fetch_tick = chan::tick_ms(5 * 60 * 1000);
     let display_tick = chan::tick_ms(epd::display::UPDATE_RATE);
     loop {
         chan_select! {
             display_tick.recv() => {
-                redraw(&mut display, &state, location, weather_configured);
+                redraw(&mut display, &state, location, weather_enabled);
             },
             fetch_tick.recv() => {
-                state = fetch_and_draw(&mut display, location, weather_configured);
+                state = fetch_and_draw(&mut display, location, weather_enabled);
             }
         }
     }
@@ -58,7 +58,7 @@ fn main() {
 fn fetch_and_draw(
     display: &mut Display,
     location: Option<(f64, f64)>,
-    weather_configured: bool,
+    weather_enabled: bool,
 ) -> State {
     let (cal, error) = match calendar::fetch_data() {
         Ok(events) => (events, None),
@@ -74,7 +74,7 @@ fn fetch_and_draw(
         log::warn!("Weather fetch failed");
     }
 
-    render::draw_cal(display, &cal, weather_status(location, wx.as_ref(), weather_configured));
+    render::draw_cal(display, &cal, weather_status(location, wx.as_ref(), weather_enabled));
     State { cal, wx, error }
 }
 
@@ -82,21 +82,21 @@ fn redraw(
     display: &mut Display,
     state: &State,
     location: Option<(f64, f64)>,
-    weather_configured: bool,
+    weather_enabled: bool,
 ) {
     if let Some(e) = &state.error {
         render::draw_error(display, e);
     } else {
-        render::draw_cal(display, &state.cal, weather_status(location, state.wx.as_ref(), weather_configured));
+        render::draw_cal(display, &state.cal, weather_status(location, state.wx.as_ref(), weather_enabled));
     }
 }
 
 fn weather_status<'a>(
     location: Option<(f64, f64)>,
     wx: Option<&'a weather::WeatherData>,
-    weather_configured: bool,
+    weather_enabled: bool,
 ) -> WeatherStatus<'a> {
-    match (weather_configured, location, wx) {
+    match (weather_enabled, location, wx) {
         (false, _, _)      => WeatherStatus::Disabled,
         (true, _, Some(w)) => WeatherStatus::Available(w),
         (true, _, None)    => WeatherStatus::Unavailable,
