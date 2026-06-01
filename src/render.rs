@@ -1,6 +1,5 @@
-use chrono::{Duration, Utc};
+use chrono::{Duration, Local, Utc};
 use std::collections::HashMap;
-use std::ops::Sub;
 
 use crate::calendar::Event;
 use crate::epd;
@@ -53,7 +52,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
     let mut image = epd::paint::new_image(WIDTH, HEIGHT, epd::paint::Color::White);
     image.clear(epd::paint::Color::White);
 
-    let now = Utc::now();
+    let now = Local::now();
     let today = now.date_naive();
 
     // Header bar
@@ -104,13 +103,14 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
         if y + 24 >= HEIGHT {
             break;
         }
-        let end = match e.all_day {
-            true => e.end.sub(Duration::seconds(1)),
-            false => e.end,
+        let start_local = e.start.with_timezone(&Local);
+        let end_local = match e.all_day {
+            true => (e.end - Duration::seconds(1)).with_timezone(&Local),
+            false => e.end.with_timezone(&Local),
         };
 
-        let is_today = e.start.date_naive() == today
-            || (e.start.date_naive() <= today && end.date_naive() >= today);
+        let is_today = start_local.date_naive() == today
+            || (start_local.date_naive() <= today && end_local.date_naive() >= today);
 
         let (fg, bg) = if is_today {
             (epd::paint::Color::White, epd::paint::Color::Black)
@@ -125,7 +125,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
             12
         } else {
             let mut h = 16u16;
-            if end.date_naive() != e.start.date_naive() { h += 16; }
+            if end_local.date_naive() != start_local.date_naive() { h += 16; }
             if !e.all_day { h += 14; }
             h
         };
@@ -146,26 +146,26 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
             );
         }
 
-        // Left column: date and time
+        // Left column: date and time (all formatted in local time)
         let (_, date_y) = if e.is_recurring {
             let date_time_str = if e.all_day {
-                e.start.format("%a %d %b").to_string()
+                start_local.format("%a %d %b").to_string()
             } else {
-                format!("{} {}", e.start.format("%a %d %b"), e.start.format("%H:%M"))
+                format!("{} {}", start_local.format("%a %d %b"), start_local.format("%H:%M"))
             };
             image.draw_string(10, y, &date_time_str, &epd::font::FONT12, fg, bg)
         } else {
             let (_, mut dy) = image.draw_string(
-                10, y, &e.start.format("%a %d %b").to_string(), &epd::font::FONT16, fg, bg,
+                10, y, &start_local.format("%a %d %b").to_string(), &epd::font::FONT16, fg, bg,
             );
-            if end.date_naive() != e.start.date_naive() {
+            if end_local.date_naive() != start_local.date_naive() {
                 let (_, edy) = image.draw_string(
-                    10, dy, &e.end.format("%a %d %b").to_string(), &epd::font::FONT16, fg, bg,
+                    10, dy, &end_local.format("%a %d %b").to_string(), &epd::font::FONT16, fg, bg,
                 );
                 dy = edy;
             }
             if !e.all_day {
-                let time_str = format!("{} - {}", e.start.format("%H:%M"), end.format("%H:%M"));
+                let time_str = format!("{} - {}", start_local.format("%H:%M"), end_local.format("%H:%M"));
                 let (_, ty) = image.draw_string(10, dy + 2, &time_str, &epd::font::FONT12, fg, bg);
                 dy = ty;
             }
@@ -190,10 +190,10 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
 
         // Forecast icon + max temp, right-aligned.
         // For multi-day events ongoing today, look up today's forecast rather than the (past) start date.
-        let forecast_date = if is_today && e.start.date_naive() < today {
+        let forecast_date = if is_today && start_local.date_naive() < today {
             today
         } else {
-            e.start.date_naive()
+            start_local.date_naive()
         };
         if let Some(f) = forecast_map.get(&forecast_date) {
             let temp_str = format!("{}C", f.temp_max);
