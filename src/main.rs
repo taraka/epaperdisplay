@@ -4,7 +4,14 @@ mod weather;
 mod render;
 
 use epd::display::Display;
+use render::WeatherStatus;
 use chan::chan_select;
+
+struct State {
+    cal: Vec<calendar::Event>,
+    wx: Option<weather::WeatherData>,
+    error: Option<String>,
+}
 
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
@@ -30,34 +37,68 @@ fn main() {
     if location.is_none() && town.is_some() {
         log::warn!("Could not geocode town, weather disabled");
     }
+    let weather_configured = town.is_some();
 
-    let (mut cal, mut wx) = refresh(&mut display, location);
+    let mut state = fetch_and_draw(&mut display, location, weather_configured);
 
     let fetch_tick = chan::tick_ms(5 * 60 * 1000);
     let display_tick = chan::tick_ms(epd::display::UPDATE_RATE);
     loop {
         chan_select! {
             display_tick.recv() => {
-                render::draw_cal(&mut display, &cal, wx.as_ref());
+                redraw(&mut display, &state, location, weather_configured);
             },
             fetch_tick.recv() => {
-                let (new_cal, new_wx) = refresh(&mut display, location);
-                cal = new_cal;
-                wx = new_wx;
+                state = fetch_and_draw(&mut display, location, weather_configured);
             }
         }
     }
 }
 
-fn refresh(
+fn fetch_and_draw(
     display: &mut Display,
     location: Option<(f64, f64)>,
-) -> (Vec<calendar::Event>, Option<weather::WeatherData>) {
-    let cal = calendar::fetch_data();
+    weather_configured: bool,
+) -> State {
+    let (cal, error) = match calendar::fetch_data() {
+        Ok(events) => (events, None),
+        Err(e) => {
+            log::error!("{}", e);
+            render::draw_error(display, &e);
+            return State { cal: Vec::new(), wx: None, error: Some(e) };
+        }
+    };
+
     let wx = location.and_then(|(lat, lon)| weather::fetch_weather(lat, lon));
     if wx.is_none() && location.is_some() {
         log::warn!("Weather fetch failed");
     }
-    render::draw_cal(display, &cal, wx.as_ref());
-    (cal, wx)
+
+    render::draw_cal(display, &cal, weather_status(location, wx.as_ref(), weather_configured));
+    State { cal, wx, error }
+}
+
+fn redraw(
+    display: &mut Display,
+    state: &State,
+    location: Option<(f64, f64)>,
+    weather_configured: bool,
+) {
+    if let Some(e) = &state.error {
+        render::draw_error(display, e);
+    } else {
+        render::draw_cal(display, &state.cal, weather_status(location, state.wx.as_ref(), weather_configured));
+    }
+}
+
+fn weather_status<'a>(
+    location: Option<(f64, f64)>,
+    wx: Option<&'a weather::WeatherData>,
+    weather_configured: bool,
+) -> WeatherStatus<'a> {
+    match (weather_configured, location, wx) {
+        (false, _, _)      => WeatherStatus::Disabled,
+        (true, _, Some(w)) => WeatherStatus::Available(w),
+        (true, _, None)    => WeatherStatus::Unavailable,
+    }
 }

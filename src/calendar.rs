@@ -21,29 +21,21 @@ pub struct Event {
     repeat: Repeat,
 }
 
-pub fn fetch_data() -> Vec<Event> {
+pub fn fetch_data() -> Result<Vec<Event>, String> {
     log::info!("Fetching calendar");
 
-    let url = match std::env::var("ICALADDR") {
-        Ok(u) => u,
-        Err(_) => {
-            log::error!("ICALADDR not set, returning empty calendar");
-            return Vec::new();
-        }
-    };
+    let url = std::env::var("ICALADDR")
+        .map_err(|_| "ICALADDR environment variable not set".to_string())?;
 
-    let body = match reqwest::blocking::get(&url) {
-        Ok(r) => match r.text() {
-            Ok(t) => t,
-            Err(e) => { log::error!("Calendar response unreadable: {}", e); return Vec::new(); }
-        },
-        Err(e) => { log::error!("Calendar request failed: {}", e); return Vec::new(); }
-    };
+    let body = reqwest::blocking::get(&url)
+        .map_err(|e| format!("Calendar request failed: {}", e))?
+        .text()
+        .map_err(|e| format!("Calendar response unreadable: {}", e))?;
 
     let cal = match ical::IcalParser::new(body.as_bytes()).next() {
         Some(Ok(c)) => c,
-        Some(Err(e)) => { log::error!("Calendar parse failed: {}", e); return Vec::new(); }
-        None => { log::error!("Calendar response was empty"); return Vec::new(); }
+        Some(Err(e)) => return Err(format!("Calendar parse failed: {}", e)),
+        None => return Err("Calendar response was empty".to_string()),
     };
 
     let mut output = Vec::new();
@@ -109,7 +101,7 @@ pub fn fetch_data() -> Vec<Event> {
     output.sort_by(|a, b| a.start.cmp(&b.start).then(a.name.cmp(&b.name)));
 
     log::info!("Loaded {} upcoming event(s)", output.len());
-    output
+    Ok(output)
 }
 
 fn expand_recurring(

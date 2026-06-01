@@ -7,7 +7,46 @@ use crate::epd;
 use crate::epd::display::{Display, HEIGHT, WIDTH};
 use crate::weather::{DailyForecast, WeatherData};
 
-pub fn draw_cal(display: &mut Display, cal: &[Event], weather: Option<&WeatherData>) {
+pub enum WeatherStatus<'a> {
+    Available(&'a WeatherData),
+    Unavailable,
+    Disabled,
+}
+
+pub fn draw_error(display: &mut Display, message: &str) {
+    log::warn!("Displaying error on screen: {}", message);
+    const HEADER_H: u16 = 36;
+
+    let mut image = epd::paint::new_image(WIDTH, HEIGHT, epd::paint::Color::White);
+    image.clear(epd::paint::Color::White);
+
+    let now = Utc::now();
+    image.draw_rectangle(
+        0, 0, WIDTH, HEADER_H,
+        epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::DrawFill::DrawFillFull,
+    );
+    image.draw_string(
+        10, 8, &now.format("%A %d %B %Y").to_string(),
+        &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
+    );
+
+    image.draw_string(
+        20, HEADER_H + 20, "Error", &epd::font::FONT24,
+        epd::paint::Color::Black, epd::paint::Color::White,
+    );
+    image.draw_line(
+        20, HEADER_H + 48, WIDTH - 20, HEADER_H + 48,
+        epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid,
+    );
+    image.draw_string(
+        20, HEADER_H + 60, message, &epd::font::FONT16,
+        epd::paint::Color::Black, epd::paint::Color::White,
+    );
+
+    display.display(image);
+}
+
+pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
     const HEADER_H: u16 = 36;
     const DIVIDER_X: u16 = 130;
 
@@ -26,16 +65,26 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: Option<&WeatherDa
         10, 8, &now.format("%A %d %B %Y").to_string(),
         &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
     );
-    if let Some(w) = weather {
-        let weather_str = format!("{}C  {}", w.temperature, w.condition);
-        let text_w = weather_str.len() as u16 * epd::font::FONT20.width;
-        let icon_x = (790u16).saturating_sub(text_w + 6 + 28);
-        let text_x = icon_x + 28 + 6;
-        draw_weather_icon(&mut image, icon_x, 4, w.weathercode, epd::paint::Color::White, IconSize::Large);
-        image.draw_string(
-            text_x, 8, &weather_str,
-            &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
-        );
+    match &weather {
+        WeatherStatus::Available(w) => {
+            let weather_str = format!("{}C  {}", w.temperature, w.condition);
+            let text_w = weather_str.len() as u16 * epd::font::FONT20.width;
+            let icon_x = (790u16).saturating_sub(text_w + 6 + 28);
+            let text_x = icon_x + 28 + 6;
+            draw_weather_icon(&mut image, icon_x, 4, w.weathercode, epd::paint::Color::White, IconSize::Large);
+            image.draw_string(
+                text_x, 8, &weather_str,
+                &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
+            );
+        }
+        WeatherStatus::Unavailable => {
+            image.draw_string(
+                (790u16).saturating_sub(14 * epd::font::FONT20.width), 8,
+                "Weather unavailable",
+                &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
+            );
+        }
+        WeatherStatus::Disabled => {}
     }
 
     // Vertical divider
@@ -44,9 +93,10 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: Option<&WeatherDa
         epd::paint::Color::Black, epd::paint::DotPixel::DotPixel1x1, epd::paint::LineStyle::LineStyleSolid,
     );
 
-    let forecast_map: HashMap<chrono::NaiveDate, &DailyForecast> = weather
-        .map(|w| w.forecast.iter().map(|f| (f.date, f)).collect())
-        .unwrap_or_default();
+    let forecast_map: HashMap<chrono::NaiveDate, &DailyForecast> = match &weather {
+        WeatherStatus::Available(w) => w.forecast.iter().map(|f| (f.date, f)).collect(),
+        _ => HashMap::new(),
+    };
 
     let mut y: u16 = HEADER_H + 8;
     let mut events_drawn: usize = 0;
