@@ -105,10 +105,6 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
     let mut events_drawn: usize = 0;
 
     for e in cal {
-        if y + 24 >= HEIGHT - FOOTER_H {
-            break;
-        }
-
         let start_local = e.start.with_timezone(&Local);
         let end_local = match e.all_day {
             true => (e.end - Duration::seconds(1)).with_timezone(&Local),
@@ -118,14 +114,21 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
         let is_today = start_local.date_naive() == today
             || (start_local.date_naive() <= today && end_local.date_naive() >= today);
 
-        let (fg, bg) = if is_today {
-            (epd::paint::Color::White, epd::paint::Color::Black)
-        } else {
-            (epd::paint::Color::Black, epd::paint::Color::White)
-        };
+        let fg = epd::paint::Color::Black;
+        let bg = epd::paint::Color::White;
 
-        let name_font = if e.is_recurring { &epd::font::FONT16 } else { &epd::font::FONT24 };
-        let name_font_h: u16 = if e.is_recurring { 16 } else { 24 };
+        let name_font = match (e.is_recurring, is_today) {
+            (true,  true)  => &epd::font::FONT20,
+            (true,  false) => &epd::font::FONT16,
+            (false, _)     => &epd::font::FONT24,
+        };
+        let name_font_h: u16 = match (e.is_recurring, is_today) {
+            (true,  true)  => 20,
+            (true,  false) => 16,
+            (false, _)     => 24,
+        };
+        let date_font = if e.is_recurring { &epd::font::FONT12 } else { &epd::font::FONT16 };
+        let date_small_font = &epd::font::FONT12;
 
         let date_h: u16 = if e.is_recurring {
             12
@@ -139,19 +142,9 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
         if !e.is_recurring && e.location.is_some() { name_h += 14; }
         let row_h = date_h.max(name_h);
 
-        if is_today {
-            image.draw_rectangle(
-                0, y.saturating_sub(4), WIDTH, y + row_h + 4,
-                epd::paint::Color::Black,
-                epd::paint::DotPixel::DotPixel1x1,
-                epd::paint::DrawFill::DrawFillFull,
-            );
-            image.draw_line(
-                DIVIDER_X, y.saturating_sub(4), DIVIDER_X, y + row_h + 4,
-                epd::paint::Color::White,
-                epd::paint::DotPixel::DotPixel1x1,
-                epd::paint::LineStyle::LineStyleSolid,
-            );
+        // row_h + separator gap + some breathing room must fit before the footer
+        if y + row_h + 18 >= HEIGHT - FOOTER_H {
+            break;
         }
 
         // Left column: date and time
@@ -161,20 +154,20 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
             } else {
                 format!("{} {}", start_local.format("%a %d %b"), start_local.format("%H:%M"))
             };
-            image.draw_string(10, y, &date_time_str, &epd::font::FONT12, fg, bg)
+            image.draw_string(10, y, &date_time_str, date_font, fg, bg)
         } else {
             let (_, mut dy) = image.draw_string(
-                10, y, &start_local.format("%a %d %b").to_string(), &epd::font::FONT16, fg, bg,
+                10, y, &start_local.format("%a %d %b").to_string(), date_font, fg, bg,
             );
             if end_local.date_naive() != start_local.date_naive() {
                 let (_, edy) = image.draw_string(
-                    10, dy, &end_local.format("%a %d %b").to_string(), &epd::font::FONT16, fg, bg,
+                    10, dy, &end_local.format("%a %d %b").to_string(), date_font, fg, bg,
                 );
                 dy = edy;
             }
             if !e.all_day {
                 let time_str = format!("{} - {}", start_local.format("%H:%M"), end_local.format("%H:%M"));
-                let (_, ty) = image.draw_string(10, dy + 2, &time_str, &epd::font::FONT12, fg, bg);
+                let (_, ty) = image.draw_string(10, dy + 2, &time_str, date_small_font, fg, bg);
                 dy = ty;
             }
             (0u16, dy)
@@ -219,13 +212,18 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
         events_drawn += 1;
         y = date_y.max(name_y);
 
+        let (line_px, line_gap) = if is_today {
+            (epd::paint::DotPixel::DotPixel2x2, 18)
+        } else {
+            (epd::paint::DotPixel::DotPixel1x1, 16)
+        };
         image.draw_line(
             10, y + 8, 790, y + 8,
             epd::paint::Color::Black,
-            epd::paint::DotPixel::DotPixel1x1,
+            line_px,
             epd::paint::LineStyle::LineStyleSolid,
         );
-        y += 16;
+        y += line_gap;
     }
 
     draw_footer(&mut image, &weather);

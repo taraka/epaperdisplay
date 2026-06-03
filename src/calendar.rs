@@ -7,10 +7,10 @@ const LOOKAHEAD_WEEKS: i64 = 8;
 
 #[derive(PartialEq, Clone)]
 enum Repeat {
-    NONE,
-    YEARLY,
-    WEEKLY,
-    MONTHLY,
+    None,
+    Yearly,
+    Weekly(u32),   // interval in weeks
+    Monthly(u32),  // interval in months
 }
 
 pub struct Event {
@@ -83,20 +83,20 @@ pub fn fetch_data() -> Result<Vec<Event>, String> {
 
     let mut output = output
         .into_iter()
-        .filter(|e| e.start >= today_start || e.repeat != Repeat::NONE)
+        .filter(|e| e.start >= today_start || e.repeat != Repeat::None)
         .flat_map(|e| match e.repeat {
-            Repeat::NONE => vec![e],
-            Repeat::YEARLY => vec![Event {
+            Repeat::None => vec![e],
+            Repeat::Yearly => vec![Event {
                 start: find_next_yearly_instance(&e.start, today_start),
                 end: find_next_yearly_instance(&e.end, today_start),
                 name: e.name,
                 location: e.location,
                 all_day: e.all_day,
                 is_recurring: false,
-                repeat: Repeat::NONE,
+                repeat: Repeat::None,
             }],
-            Repeat::WEEKLY => expand_recurring(e, today_start, lookahead, Duration::weeks(1)),
-            Repeat::MONTHLY => expand_recurring_monthly(e, today_start, lookahead),
+            Repeat::Weekly(interval) => expand_recurring(e, today_start, lookahead, Duration::weeks(interval as i64)),
+            Repeat::Monthly(interval) => expand_recurring_monthly(e, today_start, lookahead, interval),
         })
         .collect::<Vec<Event>>();
 
@@ -126,7 +126,7 @@ fn expand_recurring(
             end: dt + duration,
             all_day: e.all_day,
             is_recurring: true,
-            repeat: Repeat::NONE,
+            repeat: Repeat::None,
         });
         dt = dt + step;
     }
@@ -137,11 +137,12 @@ fn expand_recurring_monthly(
     e: Event,
     today_start: DateTime<Utc>,
     lookahead: DateTime<Utc>,
+    interval: u32,
 ) -> Vec<Event> {
     let duration = e.end - e.start;
     let mut dt = e.start;
     while dt < today_start {
-        dt = add_one_month(dt);
+        for _ in 0..interval { dt = add_one_month(dt); }
     }
     let mut instances = Vec::new();
     while dt <= lookahead {
@@ -152,9 +153,9 @@ fn expand_recurring_monthly(
             end: dt + duration,
             all_day: e.all_day,
             is_recurring: true,
-            repeat: Repeat::NONE,
+            repeat: Repeat::None,
         });
-        dt = add_one_month(dt);
+        for _ in 0..interval { dt = add_one_month(dt); }
     }
     instances
 }
@@ -190,21 +191,31 @@ fn repeat_expired(rule: &str) -> bool {
     false
 }
 
+fn parse_interval(rule: &str) -> u32 {
+    rule.split(';')
+        .find_map(|part| part.strip_prefix("INTERVAL="))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1)
+}
+
 fn get_repeat(rrule: Option<&String>) -> Repeat {
     match rrule {
         Some(rule) => {
+            if repeat_expired(rule) {
+                return Repeat::None;
+            }
             if rule.contains("FREQ=YEARLY") {
-                if repeat_expired(rule) { Repeat::NONE } else { Repeat::YEARLY }
+                Repeat::Yearly
             } else if rule.contains("FREQ=WEEKLY") {
-                if repeat_expired(rule) { Repeat::NONE } else { Repeat::WEEKLY }
+                Repeat::Weekly(parse_interval(rule))
             } else if rule.contains("FREQ=MONTHLY") {
-                if repeat_expired(rule) { Repeat::NONE } else { Repeat::MONTHLY }
+                Repeat::Monthly(parse_interval(rule))
             } else {
                 log::debug!("Unsupported RRULE, ignoring: {}", rule);
-                Repeat::NONE
+                Repeat::None
             }
         }
-        None => Repeat::NONE,
+        None => Repeat::None,
     }
 }
 
