@@ -372,5 +372,64 @@ impl Image {
         self.draw_string(x_start, y_start, &format!("{}", number)[..], font, fg_color, bg_color);
     }
 
+    // Encodes both bitplanes as a plain uncompressed 24-bit BMP, for serving
+    // over HTTP — browsers read BMP natively, so no PNG/image-crate dependency
+    // is needed.
+    pub fn to_bmp(&self) -> Vec<u8> {
+        let row_size = ((self.width as u32 * 3 + 3) / 4) * 4; // rows padded to 4 bytes
+        let pixel_data_size = row_size * self.height as u32;
+        let header_size = 14 + 40;
+        let file_size = header_size + pixel_data_size;
+
+        let mut buf = Vec::with_capacity(file_size as usize);
+
+        // BITMAPFILEHEADER
+        buf.extend_from_slice(b"BM");
+        buf.extend_from_slice(&file_size.to_le_bytes());
+        buf.extend_from_slice(&0u32.to_le_bytes()); // reserved
+        buf.extend_from_slice(&(header_size as u32).to_le_bytes()); // pixel data offset
+
+        // BITMAPINFOHEADER
+        buf.extend_from_slice(&40u32.to_le_bytes()); // header size
+        buf.extend_from_slice(&(self.width as i32).to_le_bytes());
+        buf.extend_from_slice(&(self.height as i32).to_le_bytes()); // positive = bottom-up
+        buf.extend_from_slice(&1u16.to_le_bytes()); // color planes
+        buf.extend_from_slice(&24u16.to_le_bytes()); // bits per pixel
+        buf.extend_from_slice(&0u32.to_le_bytes()); // compression: BI_RGB (none)
+        buf.extend_from_slice(&pixel_data_size.to_le_bytes());
+        buf.extend_from_slice(&2835i32.to_le_bytes()); // ~72 DPI
+        buf.extend_from_slice(&2835i32.to_le_bytes());
+        buf.extend_from_slice(&0u32.to_le_bytes()); // colors in palette
+        buf.extend_from_slice(&0u32.to_le_bytes()); // important colors
+
+        for y in (0..self.height).rev() { // BMP rows are bottom-up
+            let mut written = 0u32;
+            for x in 0..self.width {
+                let addr = (x / 8 + y * self.width_byte) as usize;
+                let mask = 0x80 >> (x % 8) as u8;
+                let black = self.image[addr] & mask == 0;
+                let red = self.red[addr] & mask == 0;
+
+                let (b, g, r) = if red {
+                    (40u8, 40u8, 200u8)
+                } else if black {
+                    (0, 0, 0)
+                } else {
+                    (255, 255, 255)
+                };
+                buf.push(b);
+                buf.push(g);
+                buf.push(r);
+                written += 3;
+            }
+            while written % 4 != 0 {
+                buf.push(0);
+                written += 1;
+            }
+        }
+
+        buf
+    }
+
 }
 

@@ -55,7 +55,7 @@ fn draw_header(image: &mut epd::paint::Image, weather: &WeatherStatus) {
 
 // ── Public drawing functions ──────────────────────────────────────────────────
 
-pub fn draw_error(display: &mut Display, message: &str) {
+pub fn draw_error(display: &mut Display, message: &str, snapshot: &crate::webserver::Snapshot) {
     log::warn!("Displaying error on screen: {}", message);
 
     let mut image = epd::paint::new_image(WIDTH, HEIGHT, epd::paint::Color::White);
@@ -78,10 +78,11 @@ pub fn draw_error(display: &mut Display, message: &str) {
         &epd::font::FONT16, epd::paint::Color::Black, epd::paint::Color::White,
     );
 
+    snapshot.update(&image);
     display.display(image);
 }
 
-pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fetched_at: DateTime<Local>) {
+pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fetched_at: DateTime<Local>, snapshot: &crate::webserver::Snapshot) {
     let mut image = epd::paint::new_image(WIDTH, HEIGHT, epd::paint::Color::White);
     image.clear(epd::paint::Color::White);
 
@@ -230,6 +231,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
 
     draw_footer(&mut image, &weather, fetched_at);
 
+    snapshot.update(&image);
     let updated = display.display(image);
     if updated {
         log::info!("Display refreshed ({} event(s) shown)", events_drawn);

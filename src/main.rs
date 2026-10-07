@@ -2,6 +2,7 @@ mod epd;
 mod calendar;
 mod weather;
 mod render;
+mod webserver;
 
 use chrono::Local;
 use epd::display::Display;
@@ -24,6 +25,13 @@ fn main() {
     let mut display = Display::init();
     display.clear();
 
+    let snapshot = webserver::Snapshot::new();
+    if std::env::var("WEB_DISABLED").is_ok() {
+        log::info!("WEB_DISABLED set, not starting web server");
+    } else {
+        webserver::start(snapshot.clone());
+    }
+
     let town = std::env::var("TOWN").ok();
     let cal_url = std::env::var("ICALADDR").ok();
     match &town {
@@ -41,17 +49,17 @@ fn main() {
     }
     let weather_enabled = town.is_some();
 
-    let mut state = fetch_and_draw(&mut display, location, weather_enabled);
+    let mut state = fetch_and_draw(&mut display, location, weather_enabled, &snapshot);
 
     let fetch_tick = chan::tick_ms(5 * 60 * 1000);
     let display_tick = chan::tick_ms(epd::display::UPDATE_RATE);
     loop {
         chan_select! {
             display_tick.recv() => {
-                redraw(&mut display, &state, location, weather_enabled);
+                redraw(&mut display, &state, location, weather_enabled, &snapshot);
             },
             fetch_tick.recv() => {
-                state = fetch_and_draw(&mut display, location, weather_enabled);
+                state = fetch_and_draw(&mut display, location, weather_enabled, &snapshot);
             }
         }
     }
@@ -61,12 +69,13 @@ fn fetch_and_draw(
     display: &mut Display,
     location: Option<(f64, f64)>,
     weather_enabled: bool,
+    snapshot: &webserver::Snapshot,
 ) -> State {
     let (cal, error) = match calendar::fetch_data() {
         Ok(events) => (events, None),
         Err(e) => {
             log::error!("{}", e);
-            render::draw_error(display, &e);
+            render::draw_error(display, &e, snapshot);
             return State { cal: Vec::new(), wx: None, error: Some(e), fetched_at: Local::now() };
         }
     };
@@ -77,7 +86,7 @@ fn fetch_and_draw(
     }
 
     let fetched_at = Local::now();
-    render::draw_cal(display, &cal, weather_status(location, wx.as_ref(), weather_enabled), fetched_at);
+    render::draw_cal(display, &cal, weather_status(location, wx.as_ref(), weather_enabled), fetched_at, snapshot);
     State { cal, wx, error, fetched_at }
 }
 
@@ -86,11 +95,12 @@ fn redraw(
     state: &State,
     location: Option<(f64, f64)>,
     weather_enabled: bool,
+    snapshot: &webserver::Snapshot,
 ) {
     if let Some(e) = &state.error {
-        render::draw_error(display, e);
+        render::draw_error(display, e, snapshot);
     } else {
-        render::draw_cal(display, &state.cal, weather_status(location, state.wx.as_ref(), weather_enabled), state.fetched_at);
+        render::draw_cal(display, &state.cal, weather_status(location, state.wx.as_ref(), weather_enabled), state.fetched_at, snapshot);
     }
 }
 
