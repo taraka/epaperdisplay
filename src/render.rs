@@ -131,6 +131,16 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
         let fg = if is_today { epd::paint::Color::Red } else { epd::paint::Color::Black };
         let bg = epd::paint::Color::White;
 
+        // Today's row renders in bold as well as red; these bitmap fonts have
+        // no bold weight, so draw_string_bold fakes it by thickening strokes.
+        let draw_text = |image: &mut epd::paint::Image, x: u16, y: u16, s: &str, font: &epd::font::Font, fg: epd::paint::Color, bg: epd::paint::Color| {
+            if is_today {
+                image.draw_string_bold(x, y, s, font, fg, bg)
+            } else {
+                image.draw_string(x, y, s, font, fg, bg)
+            }
+        };
+
         let name_font = if e.is_recurring { &epd::font::FONT16 } else { &epd::font::FONT24 };
         let name_font_h: u16 = if e.is_recurring { 16 } else { 24 };
         let date_font = if e.is_recurring { &epd::font::FONT12 } else { &epd::font::FONT16 };
@@ -161,20 +171,20 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
             } else {
                 format!("{} {}", start_local.format("%a %d %b"), start_local.format("%H:%M"))
             };
-            image.draw_string(10, y, &date_time_str, date_font, fg, bg)
+            draw_text(&mut image, 10, y, &date_time_str, date_font, fg, bg)
         } else {
-            let (_, mut dy) = image.draw_string(
-                10, y, &start_local.format("%a %d %b").to_string(), date_font, fg, bg,
+            let (_, mut dy) = draw_text(
+                &mut image, 10, y, &start_local.format("%a %d %b").to_string(), date_font, fg, bg,
             );
             if end_date != start_date {
-                let (_, edy) = image.draw_string(
-                    10, dy, &end_date.format("%a %d %b").to_string(), date_font, fg, bg,
+                let (_, edy) = draw_text(
+                    &mut image, 10, dy, &end_date.format("%a %d %b").to_string(), date_font, fg, bg,
                 );
                 dy = edy;
             }
             if !e.all_day {
                 let time_str = format!("{} - {}", start_local.format("%H:%M"), end_local.format("%H:%M"));
-                let (_, ty) = image.draw_string(10, dy + 2, &time_str, date_small_font, fg, bg);
+                let (_, ty) = draw_text(&mut image, 10, dy + 2, &time_str, date_small_font, fg, bg);
                 dy = ty;
             }
             (0u16, dy)
@@ -188,11 +198,11 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
         } else {
             e.name.chars().take(max_name_chars).collect()
         };
-        let (_, mut name_y) = image.draw_string(DIVIDER_X + 10, name_y_start, &display_name, name_font, fg, bg);
+        let (_, mut name_y) = draw_text(&mut image, DIVIDER_X + 10, name_y_start, &display_name, name_font, fg, bg);
         if !e.is_recurring {
             if let Some(loc) = &e.location {
-                let (_, ly) = image.draw_string(
-                    DIVIDER_X + 10, name_y,
+                let (_, ly) = draw_text(
+                    &mut image, DIVIDER_X + 10, name_y,
                     &loc.replace("\\n", ", ").replace("\\", " "),
                     &epd::font::FONT12, fg, bg,
                 );

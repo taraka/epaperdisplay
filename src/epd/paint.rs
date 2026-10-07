@@ -287,6 +287,18 @@ impl Image {
 
     #[allow(dead_code)]
     pub fn draw_string(&mut self, x_start: u16, y_start: u16, string: &str, font: &Font, fg_color: Color, bg_color: Color) -> (u16, u16){
+        self.draw_string_impl(x_start, y_start, string, font, fg_color, bg_color, false)
+    }
+
+    // These fixed bitmap fonts have no bold weight, so "bold" is faked by
+    // drawing each foreground pixel again one column to the right, thickening
+    // every stroke.
+    #[allow(dead_code)]
+    pub fn draw_string_bold(&mut self, x_start: u16, y_start: u16, string: &str, font: &Font, fg_color: Color, bg_color: Color) -> (u16, u16){
+        self.draw_string_impl(x_start, y_start, string, font, fg_color, bg_color, true)
+    }
+
+    fn draw_string_impl(&mut self, x_start: u16, y_start: u16, string: &str, font: &Font, fg_color: Color, bg_color: Color, bold: bool) -> (u16, u16){
         if x_start > self.width || y_start + font.height > self.height {
             return (x_start, y_start);
         }
@@ -307,7 +319,7 @@ impl Image {
                 x = x_start;
                 y = y_start;
             }
-            self.draw_char(x, y, c, &font, fg_color, bg_color);
+            self.draw_char_impl(x, y, c, &font, fg_color, bg_color, bold);
 
             x += font.width;
             if x > max_x {
@@ -319,7 +331,12 @@ impl Image {
     }
 
 
+    #[allow(dead_code)]
     pub fn draw_char(&mut self, x_start: u16, y_start: u16, ci: char, font: &Font, fg_color: Color, bg_color: Color) {
+        self.draw_char_impl(x_start, y_start, ci, font, fg_color, bg_color, false);
+    }
+
+    fn draw_char_impl(&mut self, x_start: u16, y_start: u16, ci: char, font: &Font, fg_color: Color, bg_color: Color, bold: bool) {
         let c = if ci as u8 == 25 {
             '\''
         }
@@ -345,11 +362,13 @@ impl Image {
                 if bg_color == self.color { //this process is to speed up the scan
                     if data & (0x80 >> (column % 8)) != 0 {
                         self.set_pixel(x_start + column, y_start + page, fg_color);
+                        if bold { self.set_pixel(x_start + column + 1, y_start + page, fg_color); }
                     }
                     // Paint_DrawPoint(Xpoint + Column, Ypoint + Page, Color_Foreground, DOT_PIXEL_DFT, DOT_STYLE_DFT);
                 } else {
                     if data & (0x80 >> (column % 8)) != 0 {
                         self.set_pixel(x_start + column, y_start + page, fg_color);
+                        if bold { self.set_pixel(x_start + column + 1, y_start + page, fg_color); }
                         // Paint_DrawPoint(Xpoint + Column, Ypoint + Page, Color_Foreground, DOT_PIXEL_DFT, DOT_STYLE_DFT);
                     } else {
                         self.set_pixel(x_start + column, y_start + page, bg_color);
@@ -432,4 +451,3 @@ impl Image {
     }
 
 }
-
