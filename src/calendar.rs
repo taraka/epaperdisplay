@@ -21,6 +21,7 @@ pub struct Event {
     pub all_day: bool,
     pub is_recurring: bool,
     repeat: Repeat,
+    uid: String,
 }
 
 pub fn fetch_data() -> Result<Vec<Event>, String> {
@@ -34,11 +35,58 @@ pub fn fetch_data() -> Result<Vec<Event>, String> {
         .text()
         .map_err(|e| format!("Calendar response unreadable: {}", e))?;
 
+    parse_calendar(&body)
+}
+
+fn parse_calendar(body: &str) -> Result<Vec<Event>, String> {
     let cal = match ical::IcalParser::new(body.as_bytes()).next() {
         Some(Ok(c)) => c,
         Some(Err(e)) => return Err(format!("Calendar parse failed: {}", e)),
         None => return Err("Calendar response was empty".to_string()),
     };
+
+    // A deleted single instance of a recurring event shows up as either an
+    // EXDATE on the master VEVENT, or a separate VEVENT with the same UID
+    // carrying a RECURRENCE-ID (the original occurrence time) and
+    // STATUS:CANCELLED. Collect both into a per-UID set of occurrence times
+    // to suppress from the generated recurrence below.
+    let mut excluded: HashMap<String, Vec<DateTime<Utc>>> = HashMap::new();
+    for e in &cal.events {
+        let mut uid: Option<String> = None;
+        let mut recurrence_id: Option<String> = None;
+        let mut exdates: Vec<String> = Vec::new();
+
+        for p in &e.properties {
+            let value = match &p.value {
+                Some(v) => v,
+                None => continue,
+            };
+            match p.name.as_str() {
+                "UID" => uid = Some(value.clone()),
+                "RECURRENCE-ID" => recurrence_id = Some(value.clone()),
+                "EXDATE" => exdates.push(value.clone()),
+                _ => {}
+            }
+        }
+
+        let uid = match uid {
+            Some(u) => u,
+            None => continue,
+        };
+
+        if let Some(rid) = recurrence_id {
+            if let Some((dt, _)) = unpack_time_stamp(Some(&rid)) {
+                excluded.entry(uid.clone()).or_insert_with(Vec::new).push(dt);
+            }
+        }
+        for exdate in &exdates {
+            for part in exdate.split(',') {
+                if let Some((dt, _)) = unpack_time_stamp(Some(&part.to_string())) {
+                    excluded.entry(uid.clone()).or_insert_with(Vec::new).push(dt);
+                }
+            }
+        }
+    }
 
     let mut output = Vec::new();
 
@@ -47,6 +95,13 @@ pub fn fetch_data() -> Result<Vec<Event>, String> {
         for p in e.properties {
             if p.value.is_some() {
                 props.insert(p.name, p.value.unwrap());
+            }
+        }
+
+        if let Some(status) = props.get("STATUS") {
+            if status.eq_ignore_ascii_case("CANCELLED") {
+                log::debug!("Skipping cancelled event {:?}", props.get("SUMMARY"));
+                continue;
             }
         }
 
@@ -78,6 +133,7 @@ pub fn fetch_data() -> Result<Vec<Event>, String> {
                 all_day,
                 is_recurring: false,
                 repeat,
+                uid: props.get("UID").cloned().unwrap_or_default(),
             });
         } else if let Some(summary) = props.get("SUMMARY") {
             log::debug!("Skipping event {:?} — missing DTSTART/DTEND, has keys: {:?}", summary, props.keys().collect::<Vec<_>>());
@@ -104,19 +160,31 @@ pub fn fetch_data() -> Result<Vec<Event>, String> {
             }
             keep
         })
-        .flat_map(|e| match e.repeat {
-            Repeat::None => vec![e],
-            Repeat::Yearly => vec![Event {
-                start: find_next_yearly_instance(&e.start, today_start),
-                end: find_next_yearly_instance(&e.end, today_start),
-                name: e.name,
-                location: e.location,
-                all_day: e.all_day,
-                is_recurring: false,
-                repeat: Repeat::None,
-            }],
-            Repeat::Weekly(interval) => expand_recurring(e, today_start, lookahead, Duration::weeks(interval as i64)),
-            Repeat::Monthly(interval) => expand_recurring_monthly(e, today_start, lookahead, interval),
+        .flat_map(|e| {
+            let ex = excluded.get(&e.uid).map(|v| v.as_slice()).unwrap_or(&[]);
+            match e.repeat {
+                Repeat::None => vec![e],
+                Repeat::Yearly => {
+                    let start = find_next_yearly_instance(&e.start, today_start);
+                    if ex.contains(&start) {
+                        log::debug!("Skipping deleted instance of {:?} at {}", e.name, start);
+                        vec![]
+                    } else {
+                        vec![Event {
+                            start,
+                            end: find_next_yearly_instance(&e.end, today_start),
+                            name: e.name,
+                            location: e.location,
+                            all_day: e.all_day,
+                            is_recurring: false,
+                            repeat: Repeat::None,
+                            uid: e.uid,
+                        }]
+                    }
+                }
+                Repeat::Weekly(interval) => expand_recurring(e, today_start, lookahead, Duration::weeks(interval as i64), ex),
+                Repeat::Monthly(interval) => expand_recurring_monthly(e, today_start, lookahead, interval, ex),
+            }
         })
         .collect::<Vec<Event>>();
 
@@ -131,6 +199,7 @@ fn expand_recurring(
     today_start: DateTime<Utc>,
     lookahead: DateTime<Utc>,
     step: Duration,
+    excluded: &[DateTime<Utc>],
 ) -> Vec<Event> {
     let duration = e.end - e.start;
     let mut dt = e.start;
@@ -139,15 +208,20 @@ fn expand_recurring(
     }
     let mut instances = Vec::new();
     while dt <= lookahead {
-        instances.push(Event {
-            name: e.name.clone(),
-            location: e.location.clone(),
-            start: dt,
-            end: dt + duration,
-            all_day: e.all_day,
-            is_recurring: true,
-            repeat: Repeat::None,
-        });
+        if excluded.contains(&dt) {
+            log::debug!("Skipping deleted instance of {:?} at {}", e.name, dt);
+        } else {
+            instances.push(Event {
+                name: e.name.clone(),
+                location: e.location.clone(),
+                start: dt,
+                end: dt + duration,
+                all_day: e.all_day,
+                is_recurring: true,
+                repeat: Repeat::None,
+                uid: e.uid.clone(),
+            });
+        }
         dt = dt + step;
     }
     instances
@@ -158,6 +232,7 @@ fn expand_recurring_monthly(
     today_start: DateTime<Utc>,
     lookahead: DateTime<Utc>,
     interval: u32,
+    excluded: &[DateTime<Utc>],
 ) -> Vec<Event> {
     let duration = e.end - e.start;
     let mut dt = e.start;
@@ -166,15 +241,20 @@ fn expand_recurring_monthly(
     }
     let mut instances = Vec::new();
     while dt <= lookahead {
-        instances.push(Event {
-            name: e.name.clone(),
-            location: e.location.clone(),
-            start: dt,
-            end: dt + duration,
-            all_day: e.all_day,
-            is_recurring: true,
-            repeat: Repeat::None,
-        });
+        if excluded.contains(&dt) {
+            log::debug!("Skipping deleted instance of {:?} at {}", e.name, dt);
+        } else {
+            instances.push(Event {
+                name: e.name.clone(),
+                location: e.location.clone(),
+                start: dt,
+                end: dt + duration,
+                all_day: e.all_day,
+                is_recurring: true,
+                repeat: Repeat::None,
+                uid: e.uid.clone(),
+            });
+        }
         for _ in 0..interval { dt = add_one_month(dt); }
     }
     instances
