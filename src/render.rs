@@ -1,4 +1,4 @@
-use chrono::{Duration, Local};
+use chrono::{DateTime, Duration, Local};
 use std::collections::HashMap;
 
 use crate::calendar::Event;
@@ -81,7 +81,7 @@ pub fn draw_error(display: &mut Display, message: &str) {
     display.display(image);
 }
 
-pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
+pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fetched_at: DateTime<Local>) {
     let mut image = epd::paint::new_image(WIDTH, HEIGHT, epd::paint::Color::White);
     image.clear(epd::paint::Color::White);
 
@@ -226,7 +226,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
         y += line_gap;
     }
 
-    draw_footer(&mut image, &weather);
+    draw_footer(&mut image, &weather, fetched_at);
 
     let updated = display.display(image);
     if updated {
@@ -236,7 +236,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus) {
     }
 }
 
-fn draw_footer(image: &mut epd::paint::Image, weather: &WeatherStatus) {
+fn draw_footer(image: &mut epd::paint::Image, weather: &WeatherStatus, fetched_at: DateTime<Local>) {
     let y = HEIGHT - FOOTER_H;
     image.draw_rectangle(
         0, y, WIDTH, HEIGHT,
@@ -245,8 +245,7 @@ fn draw_footer(image: &mut epd::paint::Image, weather: &WeatherStatus) {
         epd::paint::DrawFill::DrawFillFull,
     );
 
-    let now = Local::now();
-    let updated = format!("Updated {}", now.format("%H:%M"));
+    let updated = format!("Updated {}", fetched_at.format("%H:%M"));
     image.draw_string(10, y + 4, &updated, &epd::font::FONT12, epd::paint::Color::White, epd::paint::Color::Black);
 
     if let WeatherStatus::Available(w) = weather {

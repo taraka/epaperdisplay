@@ -9,6 +9,7 @@ edition = "2018"
 
 [features]
 virtual = ["sdl2"]
+bw_panel = []
 
 [dependencies]
 bresenham = "0.1.1"

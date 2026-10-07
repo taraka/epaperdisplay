@@ -3,6 +3,7 @@ mod calendar;
 mod weather;
 mod render;
 
+use chrono::Local;
 use epd::display::Display;
 use render::WeatherStatus;
 use chan::chan_select;
@@ -11,6 +12,7 @@ struct State {
     cal: Vec<calendar::Event>,
     wx: Option<weather::WeatherData>,
     error: Option<String>,
+    fetched_at: chrono::DateTime<chrono::Local>,
 }
 
 fn main() {
@@ -65,7 +67,7 @@ fn fetch_and_draw(
         Err(e) => {
             log::error!("{}", e);
             render::draw_error(display, &e);
-            return State { cal: Vec::new(), wx: None, error: Some(e) };
+            return State { cal: Vec::new(), wx: None, error: Some(e), fetched_at: Local::now() };
         }
     };
 
@@ -74,8 +76,9 @@ fn fetch_and_draw(
         log::warn!("Weather fetch failed");
     }
 
-    render::draw_cal(display, &cal, weather_status(location, wx.as_ref(), weather_enabled));
-    State { cal, wx, error }
+    let fetched_at = Local::now();
+    render::draw_cal(display, &cal, weather_status(location, wx.as_ref(), weather_enabled), fetched_at);
+    State { cal, wx, error, fetched_at }
 }
 
 fn redraw(
@@ -87,7 +90,7 @@ fn redraw(
     if let Some(e) = &state.error {
         render::draw_error(display, e);
     } else {
-        render::draw_cal(display, &state.cal, weather_status(location, state.wx.as_ref(), weather_enabled));
+        render::draw_cal(display, &state.cal, weather_status(location, state.wx.as_ref(), weather_enabled), state.fetched_at);
     }
 }
 
