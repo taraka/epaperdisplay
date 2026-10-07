@@ -49,7 +49,7 @@ fn main() {
     }
     let weather_enabled = town.is_some();
 
-    let mut state = fetch_and_draw(&mut display, location, weather_enabled, &snapshot);
+    let mut state = fetch_and_draw(&mut display, location, weather_enabled, &snapshot, None);
 
     let fetch_tick = chan::tick_ms(5 * 60 * 1000);
     let display_tick = chan::tick_ms(epd::display::UPDATE_RATE);
@@ -59,7 +59,7 @@ fn main() {
                 redraw(&mut display, &state, location, weather_enabled, &snapshot);
             },
             fetch_tick.recv() => {
-                state = fetch_and_draw(&mut display, location, weather_enabled, &snapshot);
+                state = fetch_and_draw(&mut display, location, weather_enabled, &snapshot, Some(&state));
             }
         }
     }
@@ -70,6 +70,7 @@ fn fetch_and_draw(
     location: Option<(f64, f64)>,
     weather_enabled: bool,
     snapshot: &webserver::Snapshot,
+    previous: Option<&State>,
 ) -> State {
     let (cal, error) = match calendar::fetch_data() {
         Ok(events) => (events, None),
@@ -83,6 +84,16 @@ fn fetch_and_draw(
     let wx = location.and_then(|(lat, lon)| weather::fetch_weather(lat, lon));
     if wx.is_none() && location.is_some() {
         log::warn!("Weather fetch failed");
+    }
+
+    // Skip the (slow) e-paper refresh when nothing but the clock has moved on —
+    // only redraw, and only bump the displayed "Updated" time, when the
+    // calendar or weather actually changed since the last fetch.
+    if let Some(prev) = previous {
+        if prev.error.is_none() && prev.cal == cal && prev.wx == wx {
+            log::debug!("Calendar/weather unchanged, skipping redraw");
+            return State { cal, wx, error, fetched_at: prev.fetched_at };
+        }
     }
 
     let fetched_at = Local::now();

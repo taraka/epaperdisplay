@@ -12,6 +12,7 @@ enum Repeat {
     Monthly(u32),  // interval in months
 }
 
+#[derive(PartialEq)]
 pub struct Event {
     pub name: String,
     pub location: Option<String>,

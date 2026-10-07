@@ -1,6 +1,7 @@
 use chrono::NaiveDate;
 use serde::Deserialize;
 
+#[derive(PartialEq)]
 pub struct WeatherData {
     pub temperature: i32,
     pub condition: &'static str,
@@ -10,6 +11,7 @@ pub struct WeatherData {
     pub sunset: Option<String>,
 }
 
+#[derive(PartialEq)]
 pub struct DailyForecast {
     pub date: NaiveDate,
     pub temp_max: i32,
