@@ -4,10 +4,15 @@ mod weather;
 mod render;
 mod webserver;
 
-use chrono::Local;
+use chrono::{Duration, Local};
 use epd::display::Display;
 use render::WeatherStatus;
 use chan::chan_select;
+
+// E-paper panels accumulate ghosting if they only ever get content-driven
+// partial-looking refreshes, so force a full redraw at least this often even
+// when nothing has changed.
+const FORCE_REFRESH_INTERVAL: Duration = Duration::hours(6);
 
 struct State {
     cal: Vec<calendar::Event>,
@@ -88,11 +93,17 @@ fn fetch_and_draw(
 
     // Skip the (slow) e-paper refresh when nothing but the clock has moved on —
     // only redraw, and only bump the displayed "Updated" time, when the
-    // calendar or weather actually changed since the last fetch.
+    // calendar or weather actually changed since the last fetch. Still force
+    // a full refresh periodically regardless, so ghosting doesn't accumulate.
     if let Some(prev) = previous {
-        if prev.error.is_none() && prev.cal == cal && prev.wx == wx {
+        let unchanged = prev.error.is_none() && prev.cal == cal && prev.wx == wx;
+        let stale = Local::now() - prev.fetched_at >= FORCE_REFRESH_INTERVAL;
+        if unchanged && !stale {
             log::debug!("Calendar/weather unchanged, skipping redraw");
             return State { cal, wx, error, fetched_at: prev.fetched_at };
+        }
+        if unchanged && stale {
+            log::info!("Forcing full refresh — unchanged but last redraw was over {} hours ago", FORCE_REFRESH_INTERVAL.num_hours());
         }
     }
 
