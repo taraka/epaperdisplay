@@ -7,6 +7,10 @@ use crate::epd::font::*;
 #[derive(PartialEq)]
 pub struct Image {
     pub(crate) image: ImageData,
+    // Second bitplane for the red/black/white panel. Same bit convention as
+    // `image` (1 = inactive here, 0 = ink here) but sent to a separate
+    // display register. Unused — and always blank — on the plain b/w panel.
+    pub(crate) red: ImageData,
     width: u16,
     height: u16,
     width_memory: u16,
@@ -23,8 +27,9 @@ pub type ImageData = Box<[u8]>;
 #[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Color {
-    White = 0xff,
-    Black = 0x00
+    White,
+    Black,
+    Red,
 }
 #[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq)]
@@ -86,6 +91,7 @@ pub fn new_image(width: u16, height: u16, color: Color) -> Image {
 
     Image {
         image: vec![0; image_size].into_boxed_slice(),
+        red: vec![0; image_size].into_boxed_slice(),
         width_memory: width,
         height_memory: height,
         color,
@@ -102,10 +108,17 @@ impl Image {
 
     #[allow(dead_code)]
     pub fn clear(&mut self, color: Color) {
-            for y in  0..self.height_byte {
-                for x in 0..self.width_byte {//8 pixel =  1 byte
-                    self.image[( x + y * self.width_byte) as usize] = color as u8;
-                }
+        let (black_fill, red_fill): (u8, u8) = match color {
+            Color::White => (0xff, 0xff),
+            Color::Black => (0x00, 0xff),
+            Color::Red   => (0xff, 0x00),
+        };
+        for y in  0..self.height_byte {
+            for x in 0..self.width_byte {//8 pixel =  1 byte
+                let addr = (x + y * self.width_byte) as usize;
+                self.image[addr] = black_fill;
+                self.red[addr] = red_fill;
+            }
         }
     }
 
@@ -162,13 +175,18 @@ impl Image {
         }
 
         let addr =  (x / 8 + y * self.width_byte) as usize;
-        let current_data: u8 = self.image[addr];
+        let mask = 0x80 >> (x % 8) as u8;
 
-        self.image[addr] = match color {
-            Color::Black => current_data & !(0x80 >> (x % 8) as u8 ),
-            Color::White =>  current_data | (0x80 >> (x % 8) as u8 )
-        }
+        // Each color inks exactly one plane and clears the other, so a pixel
+        // never shows ink on both at once.
+        let (black_bit, red_bit) = match color {
+            Color::White => (true, true),
+            Color::Black => (false, true),
+            Color::Red   => (true, false),
+        };
 
+        self.image[addr] = if black_bit { self.image[addr] | mask } else { self.image[addr] & !mask };
+        self.red[addr] = if red_bit { self.red[addr] | mask } else { self.red[addr] & !mask };
     }
 
     #[allow(dead_code)]

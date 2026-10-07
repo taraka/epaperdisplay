@@ -58,8 +58,9 @@ impl Display {
          self.last_image.is_some() && image == self.last_image.as_ref().unwrap()
     }
 
-    // The panel has two bitplanes: black (0x10) and red (0x13). Nothing renders
-    // in red yet, so the red plane is always sent blank.
+    // The panel has two bitplanes: black (0x10) and red (0x13). The red plane
+    // uses the same bit convention as the black one (1 = inactive, 0 = ink)
+    // but the panel expects it inverted on the wire.
     pub fn display(&mut self, image: Image) -> bool {
         if self.same_image(&image) {
             return false;
@@ -75,8 +76,10 @@ impl Display {
         }
 
         self.send_command(0x13);
-        for _i in 0..(HEIGHT*my_width) {
-            self.send_data(0x00);
+        for j in 0..HEIGHT {
+            for i in 0..my_width {
+                self.send_data(!image.red[(i + j * my_width) as usize]);
+            }
         }
 
         self.last_image = Some(image);

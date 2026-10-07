@@ -48,13 +48,18 @@ impl Display {
 
         for y in 0..HEIGHT {
             for x in 0..WIDTH {
-                //println!("x: {:<5}, y: {:<5}, data: {}", x, y, (x + y * (WIDTH/8)));
-                let data = !image.image[((x / 8) + y * (WIDTH / 8)) as usize];
-                if (0x80 >> (x % 8)) & data != 0 {
-                    canvas.set_draw_color(Color::RGB(0, 0, 0));
+                let addr = ((x / 8) + y * (WIDTH / 8)) as usize;
+                let mask = 0x80 >> (x % 8);
+                let black = (!image.image[addr]) & mask != 0;
+                let red = (!image.red[addr]) & mask != 0;
+
+                canvas.set_draw_color(if red {
+                    Color::RGB(193, 57, 43)
+                } else if black {
+                    Color::RGB(0, 0, 0)
                 } else {
-                    canvas.set_draw_color(Color::RGB(255, 255, 255));
-                }
+                    Color::RGB(255, 255, 255)
+                });
                 canvas.draw_point(Point::new(x as i32, y as i32)).unwrap();
             }
         }

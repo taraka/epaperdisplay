@@ -1,7 +1,6 @@
 use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc};
 use ical;
 use std::collections::HashMap;
-use std::ops::Sub;
 
 const LOOKAHEAD_WEEKS: i64 = 8;
 
@@ -65,6 +64,11 @@ pub fn fetch_data() -> Result<Vec<Event>, String> {
                 None => continue,
             };
 
+            log::debug!(
+                "Parsed event {:?}: start={} end={} all_day={}",
+                props.get("SUMMARY"), start, end, all_day
+            );
+
             output.push(Event {
                 name: props.get("SUMMARY").unwrap().clone(),
                 location: props.get("LOCATION").cloned(),
@@ -74,16 +78,31 @@ pub fn fetch_data() -> Result<Vec<Event>, String> {
                 is_recurring: false,
                 repeat,
             });
+        } else if let Some(summary) = props.get("SUMMARY") {
+            log::debug!("Skipping event {:?} — missing DTSTART/DTEND, has keys: {:?}", summary, props.keys().collect::<Vec<_>>());
         }
     }
 
     let now = Utc::now();
-    let today_start = now.sub(Duration::seconds(now.timestamp() % 86400));
+    // `now.timestamp() % 86400` truncates to whole seconds, but `now` itself
+    // still carries sub-second precision, so subtracting that offset from `now`
+    // leaves a few hundred milliseconds of drift past midnight instead of an
+    // exact boundary — which made an event starting at exactly 00:00:00.000
+    // compare as "before today" and get filtered out. Truncate via the date
+    // instead so today_start is always an exact midnight.
+    let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
     let lookahead = today_start + Duration::weeks(LOOKAHEAD_WEEKS);
+    log::debug!("now={} today_start={}", now, today_start);
 
     let mut output = output
         .into_iter()
-        .filter(|e| e.start >= today_start || e.repeat != Repeat::None)
+        .filter(|e| {
+            let keep = e.start >= today_start || e.repeat != Repeat::None;
+            if !keep {
+                log::debug!("Filtering out {:?}: start={} < today_start={}", e.name, e.start, today_start);
+            }
+            keep
+        })
         .flat_map(|e| match e.repeat {
             Repeat::None => vec![e],
             Repeat::Yearly => vec![Event {

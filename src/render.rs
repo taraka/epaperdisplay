@@ -38,7 +38,7 @@ fn draw_header(image: &mut epd::paint::Image, weather: &WeatherStatus) {
             let text_w = weather_str.len() as u16 * epd::font::FONT20.width;
             let icon_x = (790u16).saturating_sub(text_w + 6 + 28);
             let text_x = icon_x + 28 + 6;
-            draw_weather_icon(image, icon_x, 4, w.weathercode, epd::paint::Color::White, IconSize::Large);
+            draw_weather_icon(image, icon_x, 4, w.weathercode, icon_color(w.weathercode, epd::paint::Color::White), IconSize::Large);
             image.draw_string(
                 text_x, 8, &weather_str,
                 &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black,
@@ -47,7 +47,7 @@ fn draw_header(image: &mut epd::paint::Image, weather: &WeatherStatus) {
         WeatherStatus::Unavailable => {
             let label = "Weather unavailable";
             let x = (790u16).saturating_sub(label.len() as u16 * epd::font::FONT20.width);
-            image.draw_string(x, 8, label, &epd::font::FONT20, epd::paint::Color::White, epd::paint::Color::Black);
+            image.draw_string(x, 8, label, &epd::font::FONT20, epd::paint::Color::Red, epd::paint::Color::Black);
         }
         WeatherStatus::Disabled => {}
     }
@@ -106,27 +106,32 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
 
     for e in cal {
         let start_local = e.start.with_timezone(&Local);
-        let end_local = match e.all_day {
-            true => (e.end - Duration::seconds(1)).with_timezone(&Local),
-            false => e.end.with_timezone(&Local),
+        let end_local = e.end.with_timezone(&Local);
+
+        // All-day DTEND is an exclusive UTC midnight (the day *after* the
+        // event ends). Stepping back a day has to happen in local calendar-date
+        // space — subtracting a second from the UTC instant first can cross
+        // the local midnight boundary in either direction depending on the
+        // timezone offset, landing on the wrong day entirely.
+        let start_date = start_local.date_naive();
+        let end_date = if e.all_day {
+            end_local.date_naive() - Duration::days(1)
+        } else {
+            end_local.date_naive()
         };
 
-        let is_today = start_local.date_naive() == today
-            || (start_local.date_naive() <= today && end_local.date_naive() >= today);
+        let is_today = start_date == today || (start_date <= today && end_date >= today);
 
-        let fg = epd::paint::Color::Black;
+        log::debug!(
+            "Rendering {:?}: start_date={} end_date={} today={} is_today={} y={}",
+            e.name, start_date, end_date, today, is_today, y
+        );
+
+        let fg = if is_today { epd::paint::Color::Red } else { epd::paint::Color::Black };
         let bg = epd::paint::Color::White;
 
-        let name_font = match (e.is_recurring, is_today) {
-            (true,  true)  => &epd::font::FONT20,
-            (true,  false) => &epd::font::FONT16,
-            (false, _)     => &epd::font::FONT24,
-        };
-        let name_font_h: u16 = match (e.is_recurring, is_today) {
-            (true,  true)  => 20,
-            (true,  false) => 16,
-            (false, _)     => 24,
-        };
+        let name_font = if e.is_recurring { &epd::font::FONT16 } else { &epd::font::FONT24 };
+        let name_font_h: u16 = if e.is_recurring { 16 } else { 24 };
         let date_font = if e.is_recurring { &epd::font::FONT12 } else { &epd::font::FONT16 };
         let date_small_font = &epd::font::FONT12;
 
@@ -134,7 +139,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
             12
         } else {
             let mut h = 16u16;
-            if end_local.date_naive() != start_local.date_naive() { h += 16; }
+            if end_date != start_date { h += 16; }
             if !e.all_day { h += 14; }
             h
         };
@@ -144,6 +149,7 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
 
         // row_h + separator gap + some breathing room must fit before the footer
         if y + row_h + 18 >= HEIGHT - FOOTER_H {
+            log::debug!("Pagination break before {:?}: y={} row_h={}", e.name, y, row_h);
             break;
         }
 
@@ -159,9 +165,9 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
             let (_, mut dy) = image.draw_string(
                 10, y, &start_local.format("%a %d %b").to_string(), date_font, fg, bg,
             );
-            if end_local.date_naive() != start_local.date_naive() {
+            if end_date != start_date {
                 let (_, edy) = image.draw_string(
-                    10, dy, &end_local.format("%a %d %b").to_string(), date_font, fg, bg,
+                    10, dy, &end_date.format("%a %d %b").to_string(), date_font, fg, bg,
                 );
                 dy = edy;
             }
@@ -194,10 +200,10 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
         }
 
         // Forecast icon + max temp, right-aligned
-        let forecast_date = if is_today && start_local.date_naive() < today {
+        let forecast_date = if is_today && start_date < today {
             today
         } else {
-            start_local.date_naive()
+            start_date
         };
         if let Some(f) = forecast_map.get(&forecast_date) {
             let temp_str = format!("{}C", f.temp_max);
@@ -205,25 +211,21 @@ pub fn draw_cal(display: &mut Display, cal: &[Event], weather: WeatherStatus, fe
             let icon_x = (790u16).saturating_sub(temp_w + 4 + 20);
             let temp_x = icon_x + 20 + 4;
             let icon_y = y + (row_h.saturating_sub(20)) / 2;
-            draw_weather_icon(&mut image, icon_x, icon_y, f.weathercode, fg, IconSize::Small);
+            draw_weather_icon(&mut image, icon_x, icon_y, f.weathercode, icon_color(f.weathercode, epd::paint::Color::Black), IconSize::Small);
             image.draw_string(temp_x, y + (row_h.saturating_sub(12)) / 2, &temp_str, &epd::font::FONT12, fg, bg);
         }
 
         events_drawn += 1;
         y = date_y.max(name_y);
 
-        let (line_px, line_gap) = if is_today {
-            (epd::paint::DotPixel::DotPixel2x2, 18)
-        } else {
-            (epd::paint::DotPixel::DotPixel1x1, 16)
-        };
+        let line_color = if is_today { epd::paint::Color::Red } else { epd::paint::Color::Black };
         image.draw_line(
             10, y + 8, 790, y + 8,
-            epd::paint::Color::Black,
-            line_px,
+            line_color,
+            epd::paint::DotPixel::DotPixel1x1,
             epd::paint::LineStyle::LineStyleSolid,
         );
-        y += line_gap;
+        y += 16;
     }
 
     draw_footer(&mut image, &weather, fetched_at);
@@ -262,6 +264,17 @@ fn draw_footer(image: &mut epd::paint::Image, weather: &WeatherStatus, fetched_a
 enum IconSize {
     Small,
     Large,
+}
+
+// WMO weather codes for hazardous conditions: any freezing precipitation
+// (icing risk regardless of intensity), the heaviest rain/snow/shower
+// buckets, and all thunderstorms.
+fn is_severe_weather(code: u32) -> bool {
+    matches!(code, 56 | 57 | 65 | 66 | 67 | 75 | 82 | 86 | 95..=99)
+}
+
+fn icon_color(code: u32, base: epd::paint::Color) -> epd::paint::Color {
+    if is_severe_weather(code) { epd::paint::Color::Red } else { base }
 }
 
 fn draw_cloud_shape(image: &mut epd::paint::Image, cx: u16, cy: u16, color: epd::paint::Color) {
